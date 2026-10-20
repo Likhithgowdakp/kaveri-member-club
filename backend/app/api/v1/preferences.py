@@ -15,6 +15,7 @@ from app.services.consent_service import (
     update_member_channel_consent,
 )
 from app.services.messaging.sms import DLTSmsProvider
+from app.services.member_service import washout_member_data
 from app.security.rate_limiter import get_client_ip
 
 router = APIRouter(prefix="/preferences", tags=["Customer Preferences (Self-Service)"])
@@ -142,36 +143,22 @@ async def request_account_closure(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Customer request to close membership and opt out of all future communications.
-    Preserves minimal suppression record to guarantee no future marketing.
+    Customer self-service account deletion and complete data washout:
+    Permanently erases all member personal details, consents, and loyalty records from the system.
     """
     member = await get_member_by_credentials(
         db, member_number=req.member_number, phone=req.phone
     )
 
-    # 1. Close status
-    member.status = "closed"
-    member.notes = f"{member.notes or ''}\nClosed by customer request: {req.reason or 'Self-service'}".strip()
+    if not req.confirm_closure:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please confirm account deletion to proceed.",
+        )
 
-    # 2. Immediately withdraw all marketing consents
-    await update_member_channel_consent(
-        db=db,
-        member_id=member.id,
-        channel="whatsapp",
-        grant=False,
-        source="customer_portal_closure",
-        reason="Account closure request",
-    )
-    await update_member_channel_consent(
-        db=db,
-        member_id=member.id,
-        channel="sms",
-        grant=False,
-        source="customer_portal_closure",
-        reason="Account closure request",
-    )
+    # Perform complete permanent data erasure / washout
+    await washout_member_data(db, member.id)
 
-    await db.commit()
     return {
-        "message": "Your membership has been closed and all marketing consents have been revoked. No further messages will be sent."
+        "message": "Your account and all associated personal data, loyalty points, and consent records have been completely washed out from Kaveri Electronic records."
     }

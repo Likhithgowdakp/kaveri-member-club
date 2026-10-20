@@ -163,6 +163,11 @@ export const api = {
     });
   },
 
+  deleteMember: (memberId: number) =>
+    request<any>(`/admin/members/${memberId}`, {
+      method: 'DELETE',
+    }),
+
   sendAppSms: (memberId: number, message: string) =>
     request<any>(`/admin/members/${memberId}/send-app-sms`, {
       method: 'POST',

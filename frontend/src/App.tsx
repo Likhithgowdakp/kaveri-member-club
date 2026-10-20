@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { RegisterPage } from './pages/RegisterPage';
 import { CardPage } from './pages/CardPage';
+import { MemberLoginPage } from './pages/MemberLoginPage';
 import { PreferencesPage } from './pages/PreferencesPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
@@ -17,12 +18,15 @@ import { Store, ShieldCheck, Phone, MapPin, Mail } from 'lucide-react';
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('register');
   const [adminUser, setAdminUser] = useState<any>(null);
+  const [loggedInMember, setLoggedInMember] = useState<any>(null);
+  const [justLoggedOut, setJustLoggedOut] = useState<boolean>(false);
   const [registeredMemberData, setRegisteredMemberData] = useState<any>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [prefMemberNumber, setPrefMemberNumber] = useState<string>('');
 
-  // Check stored admin session on mount
+  // Check stored sessions on mount
   useEffect(() => {
+    // 1. Admin session
     const storedUser = localStorage.getItem('kaveri_admin_user');
     const token = localStorage.getItem('kaveri_admin_token');
     if (storedUser && token) {
@@ -30,6 +34,17 @@ export const App: React.FC = () => {
         setAdminUser(JSON.parse(storedUser));
       } catch {
         localStorage.removeItem('kaveri_admin_user');
+      }
+    }
+
+    // 2. Member session
+    const storedMember = localStorage.getItem('kaveri_member_session');
+    if (storedMember) {
+      try {
+        const parsed = JSON.parse(storedMember);
+        setLoggedInMember(parsed);
+      } catch {
+        localStorage.removeItem('kaveri_member_session');
       }
     }
 
@@ -42,8 +57,10 @@ export const App: React.FC = () => {
         setPrefMemberNumber(id);
       }
       setCurrentTab('preferences');
-    } else if (hash === 'admin' || hash === 'login') {
-      setCurrentTab(adminUser ? 'admin-dashboard' : 'admin-login');
+    } else if (hash === 'login' || hash === 'member-login') {
+      setCurrentTab('member-login');
+    } else if (hash === 'admin' || hash === 'admin-login') {
+      setCurrentTab(storedUser && token ? 'admin-dashboard' : 'admin-login');
     }
   }, []);
 
@@ -53,8 +70,26 @@ export const App: React.FC = () => {
     setCurrentTab('register');
   };
 
+  const handleMemberLogin = (memberData: any) => {
+    setLoggedInMember(memberData);
+    setJustLoggedOut(false);
+    setRegisteredMemberData({ member: memberData });
+    setCurrentTab('card');
+  };
+
+  const handleMemberLogout = () => {
+    localStorage.removeItem('kaveri_member_session');
+    setLoggedInMember(null);
+    setJustLoggedOut(true);
+    setCurrentTab('member-login');
+  };
+
   const handleRegistrationSuccess = (result: any) => {
     setRegisteredMemberData(result);
+    if (result?.member) {
+      setLoggedInMember(result.member);
+      localStorage.setItem('kaveri_member_session', JSON.stringify(result.member));
+    }
     setCurrentTab('card');
   };
 
@@ -76,6 +111,8 @@ export const App: React.FC = () => {
         setCurrentTab={setCurrentTab}
         isAdminLoggedIn={!!adminUser}
         onAdminLogout={handleAdminLogout}
+        loggedInMember={loggedInMember}
+        onMemberLogout={handleMemberLogout}
       />
 
       {/* Main Content Area */}
@@ -84,15 +121,30 @@ export const App: React.FC = () => {
           <RegisterPage onRegistrationSuccess={handleRegistrationSuccess} />
         )}
 
+        {currentTab === 'member-login' && (
+          <MemberLoginPage
+            onLoginSuccess={handleMemberLogin}
+            onNavigateToRegister={() => setCurrentTab('register')}
+            justLoggedOut={justLoggedOut}
+          />
+        )}
+
         {currentTab === 'card' && (
           <CardPage
             initialMemberData={registeredMemberData}
+            loggedInMember={loggedInMember}
             onNavigateToPreferences={handleNavigateToPreferences}
+            onNavigateToLogin={() => setCurrentTab('member-login')}
           />
         )}
 
         {currentTab === 'preferences' && (
-          <PreferencesPage initialMemberNumber={prefMemberNumber} />
+          <PreferencesPage
+            initialMemberNumber={prefMemberNumber}
+            loggedInMember={loggedInMember}
+            onMemberLogout={handleMemberLogout}
+            onNavigateToLogin={() => setCurrentTab('member-login')}
+          />
         )}
 
         {currentTab === 'privacy' && <PrivacyPage />}
@@ -156,6 +208,11 @@ export const App: React.FC = () => {
                 <li>
                   <button onClick={() => setCurrentTab('register')} className="hover:text-white transition-colors">
                     Register as Member (50 Welcome Points)
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setCurrentTab('member-login')} className="hover:text-gold-400 font-bold transition-colors">
+                    Member Sign In / ಲಾಗಿನ್
                   </button>
                 </li>
                 <li>

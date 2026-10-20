@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { Search, Filter, ChevronLeft, ChevronRight, Award, Send, Check } from 'lucide-react';
+import { Modal } from '../components/Modal';
+import { Search, Filter, ChevronLeft, ChevronRight, Award, Send, Check, Trash2, CheckCircle } from 'lucide-react';
 
 interface AdminMembersProps {
   onSelectMember: (memberId: number) => void;
@@ -16,6 +17,11 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [sentMap, setSentMap] = useState<Record<number, boolean>>({});
+
+  // Delete / Washout state
+  const [memberToDelete, setMemberToDelete] = useState<any | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
 
   const handleSendQuickSms = async (e: React.MouseEvent, m: any) => {
     e.stopPropagation();
@@ -60,8 +66,32 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
     fetchMembers();
   };
 
+  const handleDeleteMember = async () => {
+    if (!memberToDelete) return;
+    setDeleteLoading(true);
+    try {
+      await api.deleteMember(memberToDelete.id);
+      setDeleteSuccessMsg(`Member ${memberToDelete.member_number} (${memberToDelete.full_name}) and all data washed out permanently.`);
+      setMemberToDelete(null);
+      await fetchMembers();
+      setTimeout(() => setDeleteSuccessMsg(null), 6000);
+    } catch (err: any) {
+      alert(err.detail || 'Failed to delete member.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Delete / Washout success banner */}
+      {deleteSuccessMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center space-x-2">
+          <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <span>{deleteSuccessMsg}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -195,6 +225,18 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
                         >
                           Profile →
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMemberToDelete(m);
+                          }}
+                          title="Permanently Delete Member & Wash Out Data"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -227,6 +269,44 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
           </div>
         </div>
       </div>
+
+      {/* Admin Member Delete & Washout Confirmation Modal */}
+      <Modal
+        isOpen={!!memberToDelete}
+        onClose={() => setMemberToDelete(null)}
+        title="⚠️ Permanent Member Deletion & Washout"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-700 leading-relaxed">
+            Are you sure you want to permanently delete member <strong className="font-bold text-brand-950 font-mono">{memberToDelete?.member_number}</strong> (<strong className="font-bold">{memberToDelete?.full_name}</strong>)?
+          </p>
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-xs">
+            <p className="font-bold">Irreversible Data Erasure:</p>
+            <p className="mt-1 leading-relaxed">
+              All member records, phone numbers ({memberToDelete?.primary_phone}), loyalty points, consent histories, and campaign records will be completely washed out from the database immediately.
+            </p>
+          </div>
+          <div className="flex justify-end space-x-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setMemberToDelete(null)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={deleteLoading}
+              onClick={handleDeleteMember}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 disabled:opacity-50 flex items-center space-x-1.5 shadow-md cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{deleteLoading ? 'Washing out data...' : 'Permanently Delete Member'}</span>
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

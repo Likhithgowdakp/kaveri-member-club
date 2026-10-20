@@ -2,12 +2,13 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from fastapi import HTTPException, status
 from app.config import settings
 from app.models.member import Member
 from app.models.consent import MarketingConsent, ConsentAuditLog
 from app.models.loyalty import LoyaltyTransaction
+from app.models.campaign import CampaignSendJob
 from app.schemas.member import MemberRegisterRequest
 
 
@@ -150,3 +151,31 @@ async def register_member(
         await db.commit()
         await db.refresh(new_member)
         return new_member, request.consent_whatsapp, request.consent_sms
+
+
+async def washout_member_data(db: AsyncSession, member_id: int) -> bool:
+    """
+    Permanently erases ('washes out') all data associated with a member:
+    - Campaign send jobs & delivery logs
+    - Loyalty ledger transactions
+    - Consent audit logs & marketing consents
+    - Core member profile record
+    Guarantees complete right to erasure under DPDP Act 2023.
+    """
+    # 1. Delete campaign send jobs
+    await db.execute(delete(CampaignSendJob).where(CampaignSendJob.member_id == member_id))
+
+    # 2. Delete loyalty transactions
+    await db.execute(delete(LoyaltyTransaction).where(LoyaltyTransaction.member_id == member_id))
+
+    # 3. Delete consent audit logs
+    await db.execute(delete(ConsentAuditLog).where(ConsentAuditLog.member_id == member_id))
+
+    # 4. Delete marketing consents
+    await db.execute(delete(MarketingConsent).where(MarketingConsent.member_id == member_id))
+
+    # 5. Delete member profile
+    await db.execute(delete(Member).where(Member.id == member_id))
+
+    await db.commit()
+    return True

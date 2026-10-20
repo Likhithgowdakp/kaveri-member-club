@@ -5,14 +5,26 @@ import { Award, Printer, Download, Store, MessageCircle, MapPin, CheckCircle, Se
 
 interface CardPageProps {
   initialMemberData?: any;
+  loggedInMember?: any;
   onNavigateToPreferences: (memberNumber: string) => void;
+  onNavigateToLogin?: () => void;
 }
 
 export const CardPage: React.FC<CardPageProps> = ({
   initialMemberData,
+  loggedInMember,
   onNavigateToPreferences,
+  onNavigateToLogin,
 }) => {
-  const [member, setMember] = useState<any>(initialMemberData?.member || null);
+  const [member, setMember] = useState<any>(
+    initialMemberData?.member || loggedInMember || null
+  );
+
+  useEffect(() => {
+    if (loggedInMember && !initialMemberData?.member) {
+      setMember(loggedInMember);
+    }
+  }, [loggedInMember]);
   const [searchId, setSearchId] = useState('');
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [whatsappGroupUrl, setWhatsappGroupUrl] = useState('https://chat.whatsapp.com/KaveriClubOfficial');
@@ -109,6 +121,19 @@ export const CardPage: React.FC<CardPageProps> = ({
               <span>{loading ? 'Searching...' : 'Find Card'}</span>
             </button>
           </form>
+
+          {onNavigateToLogin && (
+            <p className="text-xs text-slate-500 mt-4">
+              Registered member?{' '}
+              <button
+                type="button"
+                onClick={onNavigateToLogin}
+                className="text-brand-900 font-bold hover:underline"
+              >
+                Log In with Mobile Number & Member ID →
+              </button>
+            </p>
+          )}
 
           {errorMsg && (
             <p className="mt-3 text-xs text-rose-600 font-semibold">{errorMsg}</p>

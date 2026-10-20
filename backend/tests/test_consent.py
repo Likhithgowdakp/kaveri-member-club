@@ -3,6 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.consent import MarketingConsent, ConsentAuditLog
+from app.models.member import Member
 
 
 @pytest.mark.asyncio
@@ -79,7 +80,7 @@ async def test_instant_opt_out_and_audit_trail(client: AsyncClient, test_db: Asy
 
 @pytest.mark.asyncio
 async def test_account_closure_withdraws_all_consents(client: AsyncClient, test_db: AsyncSession):
-    """Customer account closure revokes all marketing channels immediately."""
+    """Customer account closure completely washes out all records and consents under DPDP Act."""
     reg_res = await client.post("/api/v1/members/register", json={
         "full_name": "Anil Kumar",
         "primary_phone": "9448100777",
@@ -98,9 +99,13 @@ async def test_account_closure_withdraws_all_consents(client: AsyncClient, test_
     })
     assert close_res.status_code == 200
 
-    # Consents in DB must be withdrawn
+    # Consents in DB must be washed out completely
     stmt = select(MarketingConsent).where(MarketingConsent.member_id == member_id)
     res = await test_db.execute(stmt)
-    consents = {c.channel: c.consent_state for c in res.scalars().all()}
-    assert consents["whatsapp"] == "withdrawn"
-    assert consents["sms"] == "withdrawn"
+    consents = res.scalars().all()
+    assert len(consents) == 0
+
+    # Member in DB must also be washed out completely
+    m_stmt = select(Member).where(Member.id == member_id)
+    m_res = await test_db.execute(m_stmt)
+    assert m_res.scalar_one_or_none() is None

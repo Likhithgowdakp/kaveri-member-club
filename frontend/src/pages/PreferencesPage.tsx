@@ -4,13 +4,21 @@ import { ShieldCheck, MessageSquare, Smartphone, CheckCircle, AlertCircle, Trash
 
 interface PreferencesPageProps {
   initialMemberNumber?: string;
+  loggedInMember?: any;
+  onMemberLogout?: () => void;
+  onNavigateToLogin?: () => void;
 }
 
-export const PreferencesPage: React.FC<PreferencesPageProps> = ({ initialMemberNumber = '' }) => {
-  const [memberNumber, setMemberNumber] = useState(initialMemberNumber);
-  const [phone, setPhone] = useState('');
-  const [isVerified, setIsVerified] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
+export const PreferencesPage: React.FC<PreferencesPageProps> = ({
+  initialMemberNumber = '',
+  loggedInMember = null,
+  onMemberLogout,
+  onNavigateToLogin,
+}) => {
+  const [memberNumber, setMemberNumber] = useState(loggedInMember?.member_number || initialMemberNumber);
+  const [phone, setPhone] = useState(loggedInMember?.primary_phone ? loggedInMember.primary_phone.replace('+91', '') : '');
+  const [isVerified, setIsVerified] = useState(!!loggedInMember);
+  const [profile, setProfile] = useState<any>(loggedInMember || null);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -18,18 +26,31 @@ export const PreferencesPage: React.FC<PreferencesPageProps> = ({ initialMemberN
 
   // Correction form states
   const [activeTab, setActiveTab] = useState<'consents' | 'correction' | 'closure'>('consents');
-  const [corrName, setCorrName] = useState('');
-  const [corrEmail, setCorrEmail] = useState('');
-  const [corrAddress, setCorrAddress] = useState('');
+  const [corrName, setCorrName] = useState(loggedInMember?.full_name || '');
+  const [corrEmail, setCorrEmail] = useState(loggedInMember?.email || '');
+  const [corrAddress, setCorrAddress] = useState(loggedInMember?.address || '');
   const [corrNotes, setCorrNotes] = useState('');
   const [closureReason, setClosureReason] = useState('');
 
+  // Update when loggedInMember changes
+  useEffect(() => {
+    if (loggedInMember) {
+      setProfile(loggedInMember);
+      setIsVerified(true);
+      setMemberNumber(loggedInMember.member_number || '');
+      setPhone(loggedInMember.primary_phone ? loggedInMember.primary_phone.replace('+91', '') : '');
+      setCorrName(loggedInMember.full_name || '');
+      setCorrEmail(loggedInMember.email || '');
+      setCorrAddress(loggedInMember.address || '');
+    }
+  }, [loggedInMember]);
+
   // Handle URL hash params if provided e.g. #preferences?id=KAV-000001
   useEffect(() => {
-    if (initialMemberNumber) {
+    if (initialMemberNumber && !loggedInMember) {
       setMemberNumber(initialMemberNumber);
     }
-  }, [initialMemberNumber]);
+  }, [initialMemberNumber, loggedInMember]);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +132,7 @@ export const PreferencesPage: React.FC<PreferencesPageProps> = ({ initialMemberN
 
   const handleClosureSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!confirm('Are you certain you wish to close your membership? This will immediately withdraw all marketing channels.')) {
+    if (!confirm('⚠️ WARNING: PERMANENT ACCOUNT DELETION & COMPLETE DATA WASHOUT\n\nAre you sure you want to permanently delete your membership account? All your personal information (name, phone, address, email), loyalty points balance, and consent records will be completely WASHED OUT and deleted from Kaveri Electronic records. This action cannot be reversed.')) {
       return;
     }
 
@@ -121,16 +142,32 @@ export const PreferencesPage: React.FC<PreferencesPageProps> = ({ initialMemberN
       const res = await api.requestAccountClosure({
         member_number: memberNumber,
         phone: phone,
-        reason: closureReason,
+        reason: closureReason || 'Customer self-service account deletion',
         confirm_closure: true,
       });
+      localStorage.removeItem('kaveri_member_session');
       setSuccessMsg(res.message);
       setIsVerified(false);
       setProfile(null);
+      if (onMemberLogout) {
+        onMemberLogout();
+      }
     } catch (err: any) {
-      setErrorMsg(err.detail || 'Failed to close account.');
+      setErrorMsg(err.detail || 'Failed to delete account.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('kaveri_member_session');
+    setIsVerified(false);
+    setProfile(null);
+    if (onMemberLogout) {
+      onMemberLogout();
+    }
+    if (onNavigateToLogin) {
+      onNavigateToLogin();
     }
   };
 
@@ -278,8 +315,8 @@ export const PreferencesPage: React.FC<PreferencesPageProps> = ({ initialMemberN
                     : 'text-brand-300 hover:text-white'
                 }`}
               >
-                <Trash2 className="w-4 h-4" />
-                <span>Account Closure</span>
+                <Trash2 className="w-4 h-4 text-rose-400" />
+                <span>Delete Account & Washout</span>
               </button>
             </div>
           </div>
@@ -444,37 +481,39 @@ export const PreferencesPage: React.FC<PreferencesPageProps> = ({ initialMemberN
               </form>
             )}
 
-            {/* TAB 3: Account Closure & DPDP Erasure */}
+            {/* TAB 3: Account Deletion & Complete Data Washout */}
             {activeTab === 'closure' && (
               <form onSubmit={handleClosureSubmit} className="space-y-4">
                 <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 text-rose-900">
-                  <h3 className="text-sm font-bold text-rose-950">
-                    Close Membership Account (Right to Erasure)
+                  <h3 className="text-sm font-black text-rose-950 flex items-center space-x-1.5">
+                    <Trash2 className="w-4 h-4 text-rose-700" />
+                    <span>Delete My Account & Wash Out All Data</span>
                   </h3>
                   <p className="text-xs text-rose-800 mt-1 leading-relaxed">
-                    Closing your account will revoke all marketing permissions immediately and close your loyalty ledger. A minimal suppression hash is retained strictly to prevent accidental future messages under the DPDP Act.
+                    Under the Digital Personal Data Protection (DPDP) Act, 2023, you have the right to full erasure. Deleting your account will <strong className="font-bold">permanently erase all your personal data, phone number, address, email, points balance, and consent logs</strong> from Kaveri Electronic records immediately. This action cannot be reversed.
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Reason for Closure (Optional)
+                    Reason for Deletion (Optional)
                   </label>
                   <textarea
                     rows={3}
-                    placeholder="e.g. Relocated to another city"
+                    placeholder="e.g. Relocated to another city or closing account"
                     value={closureReason}
                     onChange={(e) => setClosureReason(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-rose-600 text-sm"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-6 py-2.5 rounded-xl font-bold text-white bg-rose-700 hover:bg-rose-800 text-xs shadow-md transition-all"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-white bg-rose-700 hover:bg-rose-800 text-xs shadow-md shadow-rose-900/20 transition-all flex items-center justify-center space-x-2"
                 >
-                  Confirm Account Closure & Revoke All Consents
+                  <Trash2 className="w-4 h-4" />
+                  <span>Permanently Delete My Account & Wash Out All Data</span>
                 </button>
               </form>
             )}
@@ -482,13 +521,11 @@ export const PreferencesPage: React.FC<PreferencesPageProps> = ({ initialMemberN
             <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
               <span>Notice Version: v1.0_2026_DPDP</span>
               <button
-                onClick={() => {
-                  setIsVerified(false);
-                  setProfile(null);
-                }}
-                className="font-bold text-brand-700 hover:underline"
+                type="button"
+                onClick={handleSignOut}
+                className="font-bold text-brand-700 hover:text-brand-950 hover:underline flex items-center space-x-1"
               >
-                Sign out of portal
+                <span>Sign out of member portal</span>
               </button>
             </div>
           </div>

@@ -9,9 +9,10 @@ from app.models.consent import MarketingConsent, ConsentAuditLog
 from app.models.loyalty import LoyaltyTransaction
 from app.models.admin import AdminUser
 from app.schemas.member import MemberResponse, MemberUpdateRequest
-from app.security.auth import get_current_admin
+from app.security.auth import get_current_admin, require_role
 from pydantic import BaseModel
 from app.services.messaging.sms import DLTSmsProvider
+from app.services.member_service import washout_member_data
 from app.api.deps import log_admin_action
 from app.security.rate_limiter import get_client_ip
 
@@ -271,4 +272,44 @@ async def send_app_sms_to_member(
         "recipient": member.primary_phone,
         "provider_message_id": result.provider_message_id,
         "message": f"SMS sent from Kaveri App to {member.primary_phone} under 'KAVERI CLUB HALAGURU'.",
+    }
+
+
+@router.delete("/{member_id}")
+async def delete_member_by_admin(
+    member_id: int,
+    request: Request,
+    current_user: AdminUser = Depends(require_role(["owner", "manager"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Administrative deletion & permanent data washout of a member:
+    Permanently erases all member details, consents, points, and history from the database.
+    """
+    stmt = select(Member).where(Member.id == member_id)
+    res = await db.execute(stmt)
+    member = res.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member record not found.")
+
+    member_num = member.member_number
+    member_name = member.full_name
+    member_phone = member.primary_phone
+
+    # Permanent washout
+    await washout_member_data(db, member.id)
+
+    await log_admin_action(
+        db,
+        current_user,
+        "DELETE_MEMBER_WASHOUT",
+        "member",
+        str(member_id),
+        f"Permanently washed out member {member_num} ({member_name}, {member_phone}) from the database.",
+        get_client_ip(request),
+    )
+
+    return {
+        "success": True,
+        "message": f"Member {member_num} ({member_name}) and all associated records have been permanently washed out from the system.",
     }

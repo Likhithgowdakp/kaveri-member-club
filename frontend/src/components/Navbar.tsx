@@ -6,6 +6,8 @@ interface NavbarProps {
   setCurrentTab: (tab: string) => void;
   isAdminLoggedIn: boolean;
   onAdminLogout: () => void;
+  loggedInMember?: any;
+  onMemberLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -13,6 +15,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   setCurrentTab,
   isAdminLoggedIn,
   onAdminLogout,
+  loggedInMember,
+  onMemberLogout,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -56,44 +60,99 @@ export const Navbar: React.FC<NavbarProps> = ({
               <>
                 <button
                   onClick={() => handleNav('register')}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition-all ${
                     currentTab === 'register'
                       ? 'bg-brand-800 text-white shadow-inner border border-brand-700'
                       : 'text-brand-100 hover:bg-brand-800/60 hover:text-white'
                   }`}
                 >
-                  Join Member Club
+                  Join Club
                 </button>
-                <button
-                  onClick={() => handleNav('card')}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    currentTab === 'card'
-                      ? 'bg-brand-800 text-white shadow-inner border border-brand-700'
-                      : 'text-brand-100 hover:bg-brand-800/60 hover:text-white'
-                  }`}
-                >
-                  View Membership Card
-                </button>
-                <button
-                  onClick={() => handleNav('preferences')}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    currentTab === 'preferences'
-                      ? 'bg-brand-800 text-white shadow-inner border border-brand-700'
-                      : 'text-brand-100 hover:bg-brand-800/60 hover:text-white'
-                  }`}
-                >
-                  My Preferences & Opt-Out
-                </button>
+
+                {!loggedInMember ? (
+                  <button
+                    onClick={() => handleNav('member-login')}
+                    className={`px-3.5 py-2 rounded-lg text-sm font-bold transition-all flex items-center space-x-1.5 ${
+                      currentTab === 'member-login'
+                        ? 'bg-gold-500 text-brand-950 shadow-inner'
+                        : 'text-gold-300 hover:bg-brand-800 hover:text-gold-200'
+                    }`}
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>Member Login</span>
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleNav('card')}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        currentTab === 'card'
+                          ? 'bg-brand-800 text-white shadow-inner border border-brand-700'
+                          : 'text-brand-100 hover:bg-brand-800/60 hover:text-white'
+                      }`}
+                    >
+                      My Card
+                    </button>
+                    <button
+                      onClick={() => handleNav('preferences')}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        currentTab === 'preferences'
+                          ? 'bg-brand-800 text-white shadow-inner border border-brand-700'
+                          : 'text-brand-100 hover:bg-brand-800/60 hover:text-white'
+                      }`}
+                    >
+                      Preferences & Privacy
+                    </button>
+                    <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-brand-800/80 border border-brand-700 text-gold-300 text-xs font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{loggedInMember.full_name} ({loggedInMember.member_number})</span>
+                    </div>
+                    <button
+                      onClick={onMemberLogout}
+                      title="Log Out of Member Portal"
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-300 hover:bg-rose-950/40 hover:text-rose-200 transition-colors flex items-center space-x-1 cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Log Out</span>
+                    </button>
+                  </>
+                )}
+
+                {!loggedInMember && (
+                  <>
+                    <button
+                      onClick={() => handleNav('card')}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        currentTab === 'card'
+                          ? 'bg-brand-800 text-white shadow-inner border border-brand-700'
+                          : 'text-brand-100 hover:bg-brand-800/60 hover:text-white'
+                      }`}
+                    >
+                      Find Card
+                    </button>
+                    <button
+                      onClick={() => handleNav('preferences')}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        currentTab === 'preferences'
+                          ? 'bg-brand-800 text-white shadow-inner border border-brand-700'
+                          : 'text-brand-100 hover:bg-brand-800/60 hover:text-white'
+                      }`}
+                    >
+                      Preferences
+                    </button>
+                  </>
+                )}
+
                 <button
                   onClick={() => handleNav('privacy')}
-                  className={`px-3 py-2 rounded-lg text-xs font-medium text-brand-300 hover:text-white transition-colors`}
+                  className={`px-2.5 py-2 rounded-lg text-xs font-medium text-brand-300 hover:text-white transition-colors`}
                 >
-                  Privacy Notice
+                  Privacy
                 </button>
                 <div className="h-6 w-px bg-brand-800 mx-2" />
                 <button
                   onClick={() => handleNav('admin-login')}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-gold-600 hover:bg-gold-500 text-brand-950 shadow-sm transition-all flex items-center space-x-1.5"
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold bg-gold-600 hover:bg-gold-500 text-brand-950 shadow-sm transition-all flex items-center space-x-1.5"
                 >
                   <ShieldCheck className="w-4 h-4" />
                   <span>Admin Portal</span>
@@ -185,6 +244,33 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="md:hidden bg-brand-950 border-t border-brand-800 px-4 pt-3 pb-5 space-y-2">
           {!isAdminLoggedIn ? (
             <>
+              {loggedInMember ? (
+                <div className="p-3 mb-2 rounded-xl bg-brand-900 border border-brand-700 text-gold-300 text-xs font-bold flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>{loggedInMember.full_name} ({loggedInMember.member_number})</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (onMemberLogout) onMemberLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="text-rose-300 hover:text-rose-200 text-xs font-bold flex items-center space-x-1"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleNav('member-login')}
+                  className="w-full text-left px-3 py-2.5 rounded-lg text-base font-bold bg-gold-500 text-brand-950 flex items-center space-x-2"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Member Login / ಸದಸ್ಯರ ಲಾಗಿನ್</span>
+                </button>
+              )}
+
               <button
                 onClick={() => handleNav('register')}
                 className="w-full text-left px-3 py-2.5 rounded-lg text-base font-semibold text-white hover:bg-brand-900"
@@ -195,13 +281,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => handleNav('card')}
                 className="w-full text-left px-3 py-2.5 rounded-lg text-base font-semibold text-white hover:bg-brand-900"
               >
-                View Membership Card
+                {loggedInMember ? 'My Membership Card' : 'View Membership Card'}
               </button>
               <button
                 onClick={() => handleNav('preferences')}
                 className="w-full text-left px-3 py-2.5 rounded-lg text-base font-semibold text-white hover:bg-brand-900"
               >
-                My Preferences & Opt-Out
+                {loggedInMember ? 'My Preferences & Privacy' : 'My Preferences & Opt-Out'}
               </button>
               <button
                 onClick={() => handleNav('privacy')}
@@ -211,9 +297,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
               <button
                 onClick={() => handleNav('admin-login')}
-                className="w-full mt-2 text-center px-4 py-2.5 rounded-lg text-base font-bold bg-gold-500 text-brand-950"
+                className="w-full mt-2 text-center px-4 py-2.5 rounded-lg text-base font-bold bg-slate-800 text-gold-400 hover:bg-slate-700"
               >
-                Admin Login
+                Admin Portal
               </button>
             </>
           ) : (

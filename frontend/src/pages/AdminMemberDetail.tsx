@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Send,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 
 interface AdminMemberDetailProps {
@@ -38,6 +39,10 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
   const [editAddress, setEditAddress] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
+
+  // Delete & Washout modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Official App SMS Messaging state (Sent from App under KAVERI CLUB HALAGURU)
   const [waMessage, setWaMessage] = useState('');
@@ -122,6 +127,20 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
     }
   };
 
+  const handleDeleteMember = async () => {
+    if (!data?.member) return;
+    setDeleteLoading(true);
+    try {
+      await api.deleteMember(memberId);
+      alert(`Member ${data.member.member_number} (${data.member.full_name}) and all data have been permanently washed out from the database.`);
+      setShowDeleteModal(false);
+      onBack();
+    } catch (err: any) {
+      alert(err.detail || 'Failed to delete member.');
+      setDeleteLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-12 text-center text-slate-500 text-sm">
@@ -170,6 +189,14 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
           >
             <Edit className="w-4 h-4" />
             <span>Edit Profile</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 font-bold text-xs border border-rose-200 flex items-center space-x-1 transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-4 h-4 text-rose-600" />
+            <span>Delete Member & Wash Out</span>
           </button>
         </div>
       </div>
@@ -610,6 +637,44 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
             Save Profile Updates
           </button>
         </form>
+      </Modal>
+
+      {/* Admin Member Delete & Washout Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="⚠️ Permanent Member Deletion & Washout"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-700 leading-relaxed">
+            Are you sure you want to permanently delete member <strong className="font-bold text-brand-950 font-mono">{member.member_number}</strong> (<strong className="font-bold">{member.full_name}</strong>)?
+          </p>
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-xs">
+            <p className="font-bold">Irreversible Data Erasure:</p>
+            <p className="mt-1 leading-relaxed">
+              All member records, phone numbers ({member.primary_phone}), loyalty points balance ({member.loyalty_points} pts), consent histories, and campaign records will be completely washed out from the database immediately.
+            </p>
+          </div>
+          <div className="flex justify-end space-x-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={deleteLoading}
+              onClick={handleDeleteMember}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 disabled:opacity-50 flex items-center space-x-1.5 shadow-md cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{deleteLoading ? 'Washing out data...' : 'Permanently Delete Member'}</span>
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
