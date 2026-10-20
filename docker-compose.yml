@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: kaveri_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kaveri_db}
+      POSTGRES_USER: ${POSTGRES_USER:-kaveri_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kaveri_admin} -d ${POSTGRES_DB:-kaveri_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kaveri_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    container_name: kaveri_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kaveri_admin}:${POSTGRES_PASSWORD:-change_me_in_production_password}@db:5432/${POSTGRES_DB:-kaveri_db}
+      SECRET_KEY: ${SECRET_KEY:-generate_secure_random_key_min_32_characters}
+      WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
+      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
+      SMS_ENABLED: ${SMS_ENABLED:-false}
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+      SMS_API_KEY: ${SMS_API_KEY:-}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-KAVERI}
+      SMS_ENTITY_ID: ${SMS_ENTITY_ID:-}
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.cli create-admin &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    networks:
+      - kaveri_net
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    container_name: kaveri_worker
+    restart: always
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kaveri_admin}:${POSTGRES_PASSWORD:-change_me_in_production_password}@db:5432/${POSTGRES_DB:-kaveri_db}
+      SECRET_KEY: ${SECRET_KEY:-generate_secure_random_key_min_32_characters}
+      WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
+      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      SMS_ENABLED: ${SMS_ENABLED:-false}
+      SMS_API_KEY: ${SMS_API_KEY:-}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-KAVERI}
+      SMS_ENTITY_ID: ${SMS_ENTITY_ID:-}
+    command: python -m app.services.worker
+    networks:
+      - kaveri_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+    container_name: kaveri_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - kaveri_net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  kaveri_net:
+    driver: bridge

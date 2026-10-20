@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* Modern Accessible Dialog Backdrop */
+dialog::backdrop {
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+}
+
+dialog {
+  border: none;
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  padding: 0;
+  max-width: 90vw;
+}
+
+/* Form validation feedback after user interaction */
+input:user-invalid, select:user-invalid, textarea:user-invalid {
+  border-color: #ef4444 !important;
+}
+
+input:user-valid:not(:placeholder-shown) {
+  border-color: #10b981;
+}
+
+/* Print styling for Membership Card */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #membership-card-print, #membership-card-print * {
+    visibility: visible;
+  }
+  #membership-card-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /#register
+Allow: /#card
+Allow: /#preferences
+Allow: /#privacy
+Disallow: /#admin
+
+Sitemap: https://kaveri-member-club.loca.lt/sitemap.xml
