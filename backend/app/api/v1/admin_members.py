@@ -10,6 +10,8 @@ from app.models.loyalty import LoyaltyTransaction
 from app.models.admin import AdminUser
 from app.schemas.member import MemberResponse, MemberUpdateRequest
 from app.security.auth import get_current_admin
+from pydantic import BaseModel
+from app.services.messaging.sms import DLTSmsProvider
 from app.api.deps import log_admin_action
 from app.security.rate_limiter import get_client_ip
 
@@ -221,4 +223,52 @@ async def adjust_loyalty_points(
         "member_number": member.member_number,
         "new_balance": member.loyalty_points,
         "points_adjusted": points,
+    }
+
+
+class SendAppSmsRequest(BaseModel):
+    message: str
+
+
+@router.post("/{member_id}/send-app-sms")
+async def send_app_sms_to_member(
+    member_id: int,
+    data: SendAppSmsRequest,
+    request: Request,
+    current_user: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Sends an official SMS to the customer directly from the app backend,
+    under the business sender name 'KAVERI CLUB HALAGURU' (DLT Header: KAVERI).
+    Never uses or exposes the owner's personal phone number!
+    """
+    stmt = select(Member).where(Member.id == member_id)
+    res = await db.execute(stmt)
+    member = res.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found.")
+
+    sms_provider = DLTSmsProvider()
+    result = await sms_provider.send_message(
+        recipient_phone=member.primary_phone,
+        message_text=data.message,
+    )
+
+    await log_admin_action(
+        db,
+        current_user,
+        "SEND_APP_SMS",
+        "member",
+        str(member.id),
+        f"Sent SMS from Kaveri App to {member.primary_phone} under KAVERI CLUB HALAGURU: {data.message[:60]}...",
+        get_client_ip(request),
+    )
+
+    return {
+        "success": result.success,
+        "sender": "KAVERI CLUB HALAGURU",
+        "recipient": member.primary_phone,
+        "provider_message_id": result.provider_message_id,
+        "message": f"SMS sent from Kaveri App to {member.primary_phone} under 'KAVERI CLUB HALAGURU'.",
     }

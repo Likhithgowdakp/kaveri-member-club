@@ -14,6 +14,7 @@ from app.services.consent_service import (
     get_all_consents_for_member,
     update_member_channel_consent,
 )
+from app.services.messaging.sms import DLTSmsProvider
 from app.security.rate_limiter import get_client_ip
 
 router = APIRouter(prefix="/preferences", tags=["Customer Preferences (Self-Service)"])
@@ -28,9 +29,22 @@ async def verify_member_and_get_preferences(
     Secure customer verification endpoint:
     Requires both Member ID and Primary Phone.
     Returns customer details and active consent statuses.
+    Sends automated account login notification SMS to customer's phone from Kaveri App.
     """
     member = await get_member_by_credentials(
         db, member_number=verify_req.member_number, phone=verify_req.phone
+    )
+
+    # Dispatch access notification SMS to the logged-in number
+    login_sms = (
+        f"Namaskara {member.full_name}! You have logged into KAVERI CLUB HALAGURU. "
+        f"Member ID: {member.member_number}. Points Balance: {member.loyalty_points} pts. "
+        f"Need assistance? Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri."
+    )
+    sms_provider = DLTSmsProvider()
+    await sms_provider.send_message(
+        recipient_phone=member.primary_phone,
+        message_text=login_sms,
     )
 
     consents = await get_all_consents_for_member(db, member.id)

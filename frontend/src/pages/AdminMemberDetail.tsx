@@ -6,7 +6,6 @@ import {
   Award,
   ShieldCheck,
   MessageSquare,
-  MessageCircle,
   Smartphone,
   Edit,
   PlusCircle,
@@ -40,8 +39,11 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
   const [editNotes, setEditNotes] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  // WhatsApp Direct Messaging state
+  // Official App SMS Messaging state (Sent from App under KAVERI CLUB HALAGURU)
   const [waMessage, setWaMessage] = useState('');
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsSuccess, setSmsSuccess] = useState<string | null>(null);
+  const [smsError, setSmsError] = useState<string | null>(null);
 
   const fetchDetail = async () => {
     setLoading(true);
@@ -53,13 +55,29 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
       setEditAddress(res.member.address || '');
       setEditNotes(res.member.notes || '');
 
-      // Set default personalized message
-      const defaultMsg = `Namaskara ${res.member.full_name}! Welcome to Kaveri Member Club. Your Member ID is ${res.member.member_number} with ${res.member.loyalty_points} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru!`;
+      // Set default personalized message under business name
+      const defaultMsg = `Namaskara ${res.member.full_name}! Welcome to KAVERI CLUB HALAGURU. Your Member ID is ${res.member.member_number} with ${res.member.loyalty_points} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri.`;
       setWaMessage(defaultMsg);
     } catch (err: any) {
       setErrorMsg('Failed to load member details.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendAppSms = async () => {
+    if (!waMessage.trim() || !data?.member) return;
+    setSmsSending(true);
+    setSmsSuccess(null);
+    setSmsError(null);
+    try {
+      await api.sendAppSms(data.member.id, waMessage.trim());
+      setSmsSuccess(`✓ Official SMS successfully sent from Kaveri App to ${data.member.primary_phone} under sender 'KAVERI CLUB HALAGURU'!`);
+      setTimeout(() => setSmsSuccess(null), 6000);
+    } catch (err: any) {
+      setSmsError(err.detail || 'Failed to dispatch SMS from app.');
+    } finally {
+      setSmsSending(false);
     }
   };
 
@@ -234,50 +252,55 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
         </div>
       </div>
 
-      {/* 1-Click Direct WhatsApp Messaging Section */}
+      {/* Official App SMS Dispatch (Sent under KAVERI CLUB HALAGURU, NEVER owner's personal phone) */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 border-b border-slate-100 pb-4">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-              <MessageCircle className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-xl bg-brand-900 text-gold-400 flex items-center justify-center shadow-sm">
+              <Smartphone className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-bold text-brand-950">
-                Direct WhatsApp Notification & Chat
+                Official SMS Dispatch (Sent from Kaveri App)
               </h2>
               <p className="text-xs text-slate-500">
-                Send instant WhatsApp updates directly to {member.full_name}'s phone ({member.primary_phone})
+                Sent directly from this application server to {member.full_name}'s phone ({member.primary_phone})
               </p>
             </div>
           </div>
 
-          <span
-            className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center space-x-1.5 ${
-              consents.find((c: any) => c.channel === 'whatsapp')?.status === 'opted_in'
-                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                : 'bg-amber-100 text-amber-800 border border-amber-300'
-            }`}
-          >
-            <span>DPDP Consent:</span>
-            <span>
-              {consents.find((c: any) => c.channel === 'whatsapp')?.status === 'opted_in'
-                ? '✓ Opted In for Marketing'
-                : '⚠️ Service/Important Only'}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-brand-50 text-brand-900 border border-brand-300 inline-flex items-center space-x-1">
+              <span>Sender ID:</span>
+              <span className="font-black text-brand-950">KAVERI CLUB HALAGURU</span>
             </span>
-          </span>
+          </div>
         </div>
+
+        {smsSuccess && (
+          <div className="mb-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center space-x-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span className="font-semibold">{smsSuccess}</span>
+          </div>
+        )}
+
+        {smsError && (
+          <div className="mb-4 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+            {smsError}
+          </div>
+        )}
 
         {/* Template Buttons */}
         <div className="mb-3">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-            Quick Message Templates:
+            Official SMS Templates (Sender: KAVERI CLUB HALAGURU):
           </span>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => {
                 setWaMessage(
-                  `Namaskara ${member.full_name}! Welcome to Kaveri Member Club. Your Member ID is ${member.member_number} with ${member.loyalty_points} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru!`
+                  `Namaskara ${member.full_name}! Welcome to KAVERI CLUB HALAGURU. Your Member ID is ${member.member_number} with ${member.loyalty_points} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri.`
                 );
               }}
               className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-300 transition-all flex items-center space-x-1"
@@ -290,7 +313,7 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
               type="button"
               onClick={() => {
                 setWaMessage(
-                  `Namaskara ${member.full_name}! Special member discount at Kaveri Electronic Halaguru! Get festival discounts on Smart TVs, Mixers & Appliances this week. Visit us at HMS Complex, Halaguru!`
+                  `Namaskara ${member.full_name}! Special member discount at Kaveri Electronic Halaguru! Up to 20% off on Smart TVs, Refrigerators & Mixers this week. Visit us at HMS Complex, Halaguru. Team Kaveri.`
                 );
               }}
               className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-300 transition-all flex items-center space-x-1"
@@ -302,7 +325,7 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
               type="button"
               onClick={() => {
                 setWaMessage(
-                  `Namaskara ${member.full_name}! Your Kaveri Member Club points balance is ${member.loyalty_points} points. Show your card at Kaveri Electronic Halaguru to redeem instant discounts!`
+                  `Namaskara ${member.full_name}! Your KAVERI CLUB HALAGURU points balance is ${member.loyalty_points} points. Show your card at Kaveri Electronic Halaguru to redeem instant discounts. Team Kaveri.`
                 );
               }}
               className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-300 transition-all flex items-center space-x-1"
@@ -318,28 +341,24 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
             rows={3}
             value={waMessage}
             onChange={(e) => setWaMessage(e.target.value)}
-            className="w-full p-3 rounded-2xl border border-slate-300 text-xs text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 font-sans"
-            placeholder="Type your WhatsApp message..."
+            className="w-full p-3 rounded-2xl border border-slate-300 text-xs text-slate-800 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 font-sans"
+            placeholder="Type your official SMS message..."
           />
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <p className="text-[11px] text-slate-400">
-              Opens WhatsApp Web or App on your device • Zero API charges • Guaranteed delivery
+            <p className="text-[11px] text-slate-500">
+              Dispatched from Kaveri Electronic server • Sender: <strong>KAVERI CLUB HALAGURU</strong> • Owner's personal phone is never used.
             </p>
 
-            <a
-              href={`https://wa.me/${
-                member.primary_phone.replace(/\D/g, '').startsWith('91')
-                  ? member.primary_phone.replace(/\D/g, '')
-                  : `91${member.primary_phone.replace(/\D/g, '')}`
-              }?text=${encodeURIComponent(waMessage)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-2"
+            <button
+              type="button"
+              disabled={smsSending || !waMessage.trim()}
+              onClick={handleSendAppSms}
+              className="px-5 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-800 active:scale-95 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
             >
               <Send className="w-4 h-4" />
-              <span>Send Message on WhatsApp</span>
-            </a>
+              <span>{smsSending ? 'Sending SMS from App...' : 'Send SMS from Kaveri App'}</span>
+            </button>
           </div>
         </div>
       </div>

@@ -163,6 +163,12 @@ export const api = {
     });
   },
 
+  sendAppSms: (memberId: number, message: string) =>
+    request<any>(`/admin/members/${memberId}/send-app-sms`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }),
+
   // Campaigns
   previewCampaign: (data: any) =>
     request<any>('/admin/campaigns/preview', {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { Search, Filter, ChevronLeft, ChevronRight, Award, MessageCircle } from 'lucide-react';
+import { Search, Filter, ChevronLeft, ChevronRight, Award, Send, Check } from 'lucide-react';
 
 interface AdminMembersProps {
   onSelectMember: (memberId: number) => void;
@@ -15,6 +15,21 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sentMap, setSentMap] = useState<Record<number, boolean>>({});
+
+  const handleSendQuickSms = async (e: React.MouseEvent, m: any) => {
+    e.stopPropagation();
+    try {
+      const msg = `Namaskara ${m.full_name}! Welcome to KAVERI CLUB HALAGURU. Your Member ID is ${m.member_number} with ${m.loyalty_points} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri.`;
+      await api.sendAppSms(m.id, msg);
+      setSentMap((prev) => ({ ...prev, [m.id]: true }));
+      setTimeout(() => {
+        setSentMap((prev) => ({ ...prev, [m.id]: false }));
+      }, 4000);
+    } catch (err: any) {
+      alert(err.detail || 'Failed to dispatch SMS from app.');
+    }
+  };
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -150,19 +165,28 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
                     </td>
                     <td className="py-4 px-6 text-right">
                       <div className="flex items-center justify-end space-x-2">
-                        <a
-                          href={`https://wa.me/${m.primary_phone.replace(/\D/g, '').startsWith('91') ? m.primary_phone.replace(/\D/g, '') : `91${m.primary_phone.replace(/\D/g, '')}`}?text=${encodeURIComponent(
-                            `Namaskara ${m.full_name}! Welcome to Kaveri Member Club. Your Member ID is ${m.member_number} with ${m.loyalty_points} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru!`
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          title="Send Direct WhatsApp Message"
-                          className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-sm flex items-center space-x-1 transition-all"
+                        <button
+                          type="button"
+                          onClick={(e) => handleSendQuickSms(e, m)}
+                          title="Send Official SMS from Kaveri App (Sender: KAVERI CLUB HALAGURU)"
+                          className={`px-3 py-1.5 rounded-lg text-white font-bold text-[11px] shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer ${
+                            sentMap[m.id]
+                              ? 'bg-emerald-600'
+                              : 'bg-brand-900 hover:bg-brand-800 active:scale-95'
+                          }`}
                         >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          <span>WhatsApp</span>
-                        </a>
+                          {sentMap[m.id] ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-white" />
+                              <span>SMS Sent!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-3.5 h-3.5 text-gold-400" />
+                              <span>Send App SMS</span>
+                            </>
+                          )}
+                        </button>
 
                         <button
                           type="button"

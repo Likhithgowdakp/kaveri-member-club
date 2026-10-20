@@ -11,6 +11,7 @@ from app.schemas.member import (
     MemberResponse,
 )
 from app.services.member_service import register_member
+from app.services.messaging.sms import DLTSmsProvider
 from app.security.rate_limiter import rate_limit, get_client_ip
 
 router = APIRouter(prefix="/members", tags=["Members (Public)"])
@@ -34,6 +35,7 @@ async def register_new_member(
     - Concurrency-safe unique membership ID (e.g. KAV-000001).
     - Stores separate, voluntary WhatsApp and SMS consent.
     - Awards welcome loyalty points.
+    - Automatically dispatches welcome SMS from the app under KAVERI CLUB HALAGURU.
     """
     ip_address = get_client_ip(request)
     user_agent = request.headers.get("User-Agent")
@@ -48,6 +50,18 @@ async def register_new_member(
     welcome_msg = (
         f"Congratulations {member.full_name}! You are now an official member of Kaveri Member Club. "
         f"Your Membership ID is {member.member_number}. You have received {settings.REGISTRATION_BONUS_POINTS} welcome points!"
+    )
+
+    # Automatically dispatch welcome SMS directly from the Kaveri App to the registered phone number
+    sms_text = (
+        f"Namaskara {member.full_name}! Welcome to KAVERI CLUB HALAGURU. "
+        f"Your Member ID is {member.member_number} with {settings.REGISTRATION_BONUS_POINTS} loyalty points. "
+        f"Redeem instant discounts on TVs & home appliances at Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri."
+    )
+    sms_provider = DLTSmsProvider()
+    await sms_provider.send_message(
+        recipient_phone=member.primary_phone,
+        message_text=sms_text,
     )
 
     return MemberRegistrationResult(

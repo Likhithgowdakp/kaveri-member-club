@@ -6,4 +6,4 @@ Allow: /#preferences
 Allow: /#privacy
 Disallow: /#admin
 
-Sitemap: https://kaveri-member-club.loca.lt/sitemap.xml
+Sitemap: https://guitar-paths-mentioned-created.trycloudflare.com/sitemap.xml
