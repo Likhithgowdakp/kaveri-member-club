@@ -1,6 +1,41 @@
-# Kaveri Member Club • Production Deployment Guide
+# Kaveri Member Club • Production Deployment & Google Search Guide
 
-This guide details the production deployment, HTTPS configuration, automated backups, and messaging provider onboarding for **Kaveri Electronic Halaguru**.
+This guide details the live public access, Google search engine indexing, free cloud hosting (Render / Railway), and VPS deployment for **Kaveri Electronic Halaguru**.
+
+---
+
+## 0. Live Public Internet Access & Credentials
+
+The application is currently published to the public internet:
+
+* **Public Web URL**: [https://kaveri-member-club.loca.lt](https://kaveri-member-club.loca.lt)
+  *(If prompted for a Tunnel Password in your browser, enter: **`152.57.134.179`**)*
+* **Admin Portal**: [https://kaveri-member-club.loca.lt/#admin](https://kaveri-member-club.loca.lt/#admin)
+* **Owner Username**: `Prabhu_kaveri`
+* **Owner Password**: `PrabhuSwamy@1987`
+* **Official WhatsApp Group**: `https://chat.whatsapp.com/CIsTF8bPWOr9R94534QTSt?s=cl&p=a&mlu=4&ilr=4`
+
+---
+
+## 0.1 How to Make the Site Searchable on Google
+
+To ensure customers in Halaguru, Kanakapura, and Karnataka find the store when searching Google for **"Kaveri Electronic Halaguru"** or **"Kaveri Member Club"**:
+
+1. **Pre-Configured SEO Tags**:
+   * The application already includes semantic HTML `<title>`, `<meta name="description">`, and OpenGraph tags.
+   * Built-in `Schema.org` JSON-LD Structured Data specifies `ElectronicsStore` at *HMS Complex, Kanakapura Main Road, Halaguru*.
+   * Crawler configuration files are live at `/robots.txt` and `/sitemap.xml`.
+
+2. **Submitting to Google Search Console (Takes 2 minutes)**:
+   * Go to **[Google Search Console](https://search.google.com/search-console)** and sign in with your Google Account.
+   * Click **Add Property** $\rightarrow$ enter your site's URL (e.g. `https://kaverielectronics.in` or `https://kaveri-member-club.loca.lt`).
+   * In the left menu, click **Sitemaps**.
+   * Enter `sitemap.xml` in the "Add a new sitemap" box and click **Submit**.
+   * Google's crawler will index your pages (`#register`, `#card`, `#preferences`, `#privacy`).
+
+3. **Google Business Profile Integration**:
+   * On your Google Maps / Google Business profile for *Kaveri Electronic Halaguru*, add the website link to your Member Club.
+   * This immediately connects the physical store on Kanakapura Main Road to the digital loyalty club in Google Search.
 
 ---
 
