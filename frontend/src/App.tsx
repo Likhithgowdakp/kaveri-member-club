@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { RegisterPage } from './pages/RegisterPage';
 import { CardPage } from './pages/CardPage';
@@ -91,13 +91,42 @@ const parseRoute = (user: any): string => {
 };
 
 export const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<string>('register');
+  const [currentTab, setCurrentTab] = useState<string>(() => parseRoute(null));
   const [adminUser, setAdminUser] = useState<any>(null);
   const [loggedInMember, setLoggedInMember] = useState<any>(null);
   const [justLoggedOut, setJustLoggedOut] = useState<boolean>(false);
   const [registeredMemberData, setRegisteredMemberData] = useState<any>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [prefMemberNumber, setPrefMemberNumber] = useState<string>('');
+
+  // Secret admin shortcut: Alt+A or Ctrl+Shift+A
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.altKey && e.key.toLowerCase() === 'a') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a')) {
+        e.preventDefault();
+        navigateTo('admin-login');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Secret admin access: Triple-tap copyright on mobile
+  const tapCountRef = useRef(0);
+  const lastTapRef = useRef(0);
+  const handleSecretAdminTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 600) {
+      tapCountRef.current += 1;
+    } else {
+      tapCountRef.current = 1;
+    }
+    lastTapRef.current = now;
+    if (tapCountRef.current >= 3) {
+      tapCountRef.current = 0;
+      navigateTo('admin-login');
+    }
+  };
 
   // PWA Mobile App Install Prompt
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -455,7 +484,13 @@ export const App: React.FC = () => {
           </div>
 
           <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500">
-            <p>© {new Date().getFullYear()} Kaveri Electronic Halaguru. All rights reserved.</p>
+            <p
+              onClick={handleSecretAdminTap}
+              className="cursor-pointer select-none hover:text-slate-400 transition-colors"
+              title="Kaveri Electronic Halaguru"
+            >
+              © {new Date().getFullYear()} Kaveri Electronic Halaguru. All rights reserved.
+            </p>
             <p className="mt-2 sm:mt-0 flex items-center space-x-1">
               <ShieldCheck className="w-3.5 h-3.5 text-brand-400" />
               <span>Compliant with Digital Personal Data Protection Act, 2023</span>

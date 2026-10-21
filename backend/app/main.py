@@ -91,11 +91,32 @@ app.include_router(webhooks_router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit_router, prefix=settings.API_V1_PREFIX)
 app.include_router(settings_router, prefix=settings.API_V1_PREFIX)
 
-# Mount built frontend dist if present (Unified Single-Port Production Serving)
+# Mount built frontend dist if present (Unified Single-Port Production Serving with SPA Fallback)
 import os
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 dist_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "dist")
 if os.path.isdir(dist_path):
-    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static_frontend")
+    assets_path = os.path.join(dist_path, "assets")
+    if os.path.isdir(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="static_assets")
+
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_spa_frontend(full_path: str):
+        # Never swallow API routes
+        if full_path.startswith("api/"):
+            return {"detail": "Not Found"}
+
+        # Serve existing static file (e.g. logo.png, favicon.png, sw.js, manifest.json)
+        candidate = os.path.join(dist_path, full_path)
+        if full_path and os.path.isfile(candidate):
+            return FileResponse(candidate)
+
+        # SPA Fallback: Serve index.html for all client routes (/admin/login, /admin, /card, etc.)
+        index_file = os.path.join(dist_path, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+        return {"detail": "Frontend index.html not found"}
+
 
