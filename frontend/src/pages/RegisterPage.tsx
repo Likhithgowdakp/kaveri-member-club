@@ -37,7 +37,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
   const [showPassword, setShowPassword] = useState(false);
 
   // ₹499 UPI Payment State
-  const [upiId, setUpiId] = useState('7204162882@ybl');
+  const [upiId, setUpiId] = useState('7353398831-2@naviaxis');
   const [fee, setFee] = useState(499);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -59,7 +59,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
     const fetchSettingsAndBuildQr = async () => {
       try {
         const settings = await api.getPublicSettings();
-        const activeUpi = settings.store_upi_id || '7204162882@ybl';
+        const activeUpi = settings.store_upi_id || '7353398831-2@naviaxis';
         const activeFee = settings.membership_fee || 499;
         setUpiId(activeUpi);
         setFee(activeFee);
@@ -97,6 +97,18 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    setErrorMsg(null);
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type.toLowerCase())) {
+      setErrorMsg('Invalid file format. Permitted screenshot image formats are JPEG, PNG, or WEBP only.');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMsg('Screenshot file size must be less than 10MB.');
+      return;
+    }
 
     setScreenshotName(file.name);
     const reader = new FileReader();
@@ -151,8 +163,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
       return;
     }
 
+    if (!paymentUtr || paymentUtr.trim().length < 6) {
+      setErrorMsg('Please enter the 12-digit UPI UTR / Transaction Reference number from your payment receipt.');
+      return;
+    }
+
     if (!screenshotBase64) {
-      setErrorMsg(`Please upload a screenshot of your ₹${fee} UPI payment receipt to proceed with registration.`);
+      setErrorMsg(`Please upload a screenshot of your ₹${fee} UPI payment receipt showing transaction details.`);
       return;
     }
 
@@ -464,16 +481,20 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
                 {/* UTR Input */}
                 <div>
                   <label htmlFor="paymentUtr" className="block text-xs font-bold text-slate-800 mb-1">
-                    UPI Transaction ID / UTR Number
+                    UPI Transaction ID / UTR Number <span className="text-rose-600">*</span>
                   </label>
                   <input
                     id="paymentUtr"
                     type="text"
-                    placeholder="e.g. 12-digit UTR from receipt"
+                    required
+                    placeholder="12-digit UTR from payment receipt"
                     value={paymentUtr}
                     onChange={(e) => setPaymentUtr(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 text-xs font-mono text-slate-900"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Enter the 12-digit UTR / reference number displayed in your payment app (PhonePe / GPay / Paytm / BHIM).
+                  </p>
                 </div>
               </div>
             </div>
@@ -493,11 +514,11 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
                     Click or Drag to Upload Payment Screenshot
                   </span>
                   <span className="text-[11px] text-slate-500 mt-0.5">
-                    Select the screenshot confirming ₹{fee} transferred to {upiId}
+                    Select JPEG, PNG, or WEBP screenshot showing ₹{fee} transferred to {upiId}
                   </span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={handleFileChange}
                     className="hidden"
                   />

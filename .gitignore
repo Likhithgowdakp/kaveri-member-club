@@ -27,3 +27,10 @@ yarn-error.log*
 .idea/
 .vscode/
 *.swp
+
+# Android
+android_app/.gradle/
+android_app/build/
+android_app/app/build/
+*.apk
+*.aab

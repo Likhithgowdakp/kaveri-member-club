@@ -9,7 +9,7 @@ from app.models.consent import MarketingConsent, ConsentAuditLog
 from app.models.loyalty import LoyaltyTransaction
 from app.models.admin import AdminUser
 from app.models.setting import StoreSetting
-from app.schemas.member import MemberResponse, MemberUpdateRequest, PaymentRejectionRequest
+from app.schemas.member import MemberResponse, MemberUpdateRequest, PaymentRejectionRequest, PaymentApprovalRequest
 from app.security.auth import get_current_admin, require_role
 from pydantic import BaseModel
 import urllib.parse
@@ -94,6 +94,7 @@ async def list_pending_payment_members(
 async def approve_member_payment(
     member_id: int,
     request: Request,
+    data: Optional[PaymentApprovalRequest] = None,
     current_user: AdminUser = Depends(require_role(["owner", "manager"])),
     db: AsyncSession = Depends(get_db),
 ):
@@ -104,11 +105,25 @@ async def approve_member_payment(
     - Dispatches official Welcome SMS under 'KAVERI CLUB HALAGURU'.
     - Logs admin action in audit trail.
     """
+    if data and not data.verified_with_bank_statement:
+        raise HTTPException(
+            status_code=400,
+            detail="Bank statement reconciliation confirmation is required. You must verify that ₹499 was received in actual bank / UPI statements before approving.",
+        )
+
     stmt = select(Member).where(Member.id == member_id)
     res = await db.execute(stmt)
     member = res.scalar_one_or_none()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found.")
+
+    # Idempotency guard: Prevent multiple active cards from being generated
+    if member.status == "active" and member.payment_status == "approved":
+        return {
+            "success": True,
+            "message": f"Membership {member.member_number} ({member.full_name}) is already active and approved.",
+            "member": MemberResponse.model_validate(member),
+        }
 
     now = datetime.now(timezone.utc)
     member.payment_status = "approved"
@@ -124,7 +139,7 @@ async def approve_member_payment(
     # Dispatch official welcome SMS under KAVERI CLUB HALAGURU
     clean_phone = "".join(filter(str.isdigit, member.primary_phone))[-10:]
     welcome_sms = (
-        f"Namaskara {member.full_name}! Your payment of Rs {member.payment_amount} is verified and approved. "
+        f"Namaskara {member.full_name}! Your payment of Rs {member.payment_amount} is verified against store bank records and approved. "
         f"Welcome to KAVERI CLUB HALAGURU! Member ID: {member.member_number} ({member.loyalty_points} loyalty pts). "
         f"Your digital card is now active! Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru."
     )
@@ -151,7 +166,7 @@ async def approve_member_payment(
         "APPROVE_PAYMENT_AND_ISSUE_CARD",
         "member",
         str(member.id),
-        f"Approved ₹{member.payment_amount} payment for {member.member_number} ({member.full_name}, +91{clean_phone}). Digital membership card unlocked.",
+        f"Verified ₹{member.payment_amount} payment against store bank records for UPI ID 7353398831-2@naviaxis (UTR: {member.payment_utr or 'N/A'}). Approved for {member.member_number} ({member.full_name}, +91{clean_phone}). Digital membership card unlocked.",
         get_client_ip(request),
     )
 

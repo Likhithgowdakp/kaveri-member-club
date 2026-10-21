@@ -117,3 +117,117 @@ async def test_payment_rejection_and_resubmission(
     resub_data = resubmit_res.json()
     assert resub_data["payment_status"] == "pending"
     assert resub_data["payment_utr"] == "NEWUPI999888"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_utr_rejected(client: AsyncClient, auth_headers_owner: dict):
+    """
+    Test that submitting an already used UTR reference is rejected across members.
+    """
+    sample_screenshot = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+    shared_utr = "DUPLICATEUTR999"
+
+    # Member 1 registers with UTR
+    res1 = await client.post(
+        "/api/v1/members/register",
+        json={
+            "full_name": "Applicant One",
+            "primary_phone": "9876500001",
+            "accept_privacy_notice": True,
+            "payment_screenshot": sample_screenshot,
+            "payment_utr": shared_utr,
+            "payment_amount": 499,
+        },
+    )
+    assert res1.status_code == 201
+
+    # Member 2 tries to register with same UTR -> Rejected
+    res2 = await client.post(
+        "/api/v1/members/register",
+        json={
+            "full_name": "Applicant Two",
+            "primary_phone": "9876500002",
+            "accept_privacy_notice": True,
+            "payment_screenshot": sample_screenshot,
+            "payment_utr": shared_utr,
+            "payment_amount": 499,
+        },
+    )
+    assert res2.status_code == 400
+    assert "Duplicate UTR flagged" in res2.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_customer_payment_submission_endpoint_and_bank_check(
+    client: AsyncClient, auth_headers_owner: dict
+):
+    """
+    Test customer payment submission endpoint:
+    - Customer submits Full Name, Phone, Member Number, UTR, Screenshot.
+    - Gets exact required response message.
+    - Admin bank verification enforcement.
+    """
+    sample_screenshot = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+
+    # Register member without payment first
+    reg = await client.post(
+        "/api/v1/members/register",
+        json={
+            "full_name": "Manjunath Gowda",
+            "primary_phone": "9876500003",
+            "accept_privacy_notice": True,
+        },
+    )
+    assert reg.status_code == 201
+    member = reg.json()["member"]
+    member_num = member["member_number"]
+    member_id = member["id"]
+
+    # Submit payment via /api/v1/members/submit-payment
+    sub_res = await client.post(
+        "/api/v1/members/submit-payment",
+        json={
+            "full_name": "Manjunath Gowda",
+            "primary_phone": "9876500003",
+            "member_number": member_num,
+            "payment_utr": "MANJU499001",
+            "payment_screenshot": sample_screenshot,
+        },
+    )
+    assert sub_res.status_code == 200
+    sub_data = sub_res.json()
+    assert (
+        sub_data["message"]
+        == "Your ₹499 membership payment has been submitted for verification. Your membership card will be available after the administrator verifies and approves your payment."
+    )
+    assert sub_data["status_label"] == "Payment Verification Pending"
+    assert sub_data["member"]["payment_status"] == "pending"
+
+    # Admin verifies without bank confirmation -> Rejected
+    bad_approve = await client.post(
+        f"/api/v1/admin/members/{member_id}/approve-payment",
+        headers=auth_headers_owner,
+        json={"verified_with_bank_statement": False},
+    )
+    assert bad_approve.status_code == 400
+    assert "Bank statement reconciliation confirmation is required" in bad_approve.json()["detail"]
+
+    # Admin verifies with bank confirmation -> Approved
+    good_approve = await client.post(
+        f"/api/v1/admin/members/{member_id}/approve-payment",
+        headers=auth_headers_owner,
+        json={"verified_with_bank_statement": True},
+    )
+    assert good_approve.status_code == 200
+    assert good_approve.json()["member"]["payment_status"] == "approved"
+    assert good_approve.json()["member"]["status"] == "active"
+
+    # Idempotent approval
+    dup_approve = await client.post(
+        f"/api/v1/admin/members/{member_id}/approve-payment",
+        headers=auth_headers_owner,
+        json={"verified_with_bank_statement": True},
+    )
+    assert dup_approve.status_code == 200
+    assert "already active and approved" in dup_approve.json()["message"]
+

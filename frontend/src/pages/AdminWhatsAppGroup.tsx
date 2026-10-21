@@ -32,7 +32,7 @@ export const AdminWhatsAppGroup: React.FC = () => {
   const [showKey, setShowKey] = useState(false);
 
   // UPI Payment Settings
-  const [upiId, setUpiId] = useState('7204162882@ybl');
+  const [upiId, setUpiId] = useState('7353398831-2@naviaxis');
   const [membershipFee, setMembershipFee] = useState(499);
   const [upiSavedSuccess, setUpiSavedSuccess] = useState(false);
   const [upiLoading, setUpiLoading] = useState(false);
@@ -440,7 +440,7 @@ export const AdminWhatsAppGroup: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 7204162882@ybl"
+                  placeholder="e.g. 7353398831-2@naviaxis"
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 text-xs font-mono"

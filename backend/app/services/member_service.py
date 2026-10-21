@@ -58,6 +58,20 @@ async def register_member(
                 ),
             )
 
+        # 1.1 Check for duplicate UTR reference if provided
+        if request.payment_utr and request.payment_utr.strip():
+            clean_utr = request.payment_utr.strip().upper()
+            dup_stmt = select(Member).where(
+                Member.payment_utr == clean_utr,
+                Member.payment_status.in_(["approved", "pending"])
+            )
+            dup_res = await db.execute(dup_stmt)
+            if dup_res.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Duplicate UTR flagged: Reference number '{clean_utr}' has already been submitted for another membership. Each payment requires a unique transaction reference.",
+                )
+
         # 2. Concurrency-safe membership ID generation
         member_number = await generate_next_member_number(db)
         

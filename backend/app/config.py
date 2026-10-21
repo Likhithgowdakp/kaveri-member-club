@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     MEMBER_ID_PREFIX: str = "KAV-"
     DPDP_NOTICE_VERSION: str = "v1.0_2026_DPDP"
     REGISTRATION_BONUS_POINTS: int = 50
+    DEFAULT_STORE_UPI_ID: str = "7353398831-2@naviaxis"
+    MEMBERSHIP_FEE: int = 499
     
     # WhatsApp Cloud API
     WHATSAPP_ENABLED: bool = False

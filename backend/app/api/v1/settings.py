@@ -31,7 +31,7 @@ async def get_public_settings(db: AsyncSession = Depends(get_db)):
     saved = {s.key: s.value for s in res.scalars().all()}
 
     group_url = saved.get("whatsapp_group_url", settings.BUSINESS_WHATSAPP_GROUP_URL)
-    store_upi = saved.get("store_upi_id", "7204162882@ybl")
+    store_upi = saved.get("store_upi_id", "7353398831-2@naviaxis")
     fee_val = int(saved.get("membership_fee", "499"))
 
     return {

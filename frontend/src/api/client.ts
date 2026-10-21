@@ -81,6 +81,18 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  submitCustomerPayment: (data: {
+    full_name: string;
+    primary_phone: string;
+    member_number: string;
+    payment_utr: string;
+    payment_screenshot: string;
+  }) =>
+    request<any>('/members/submit-payment', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   // Customer Preferences & DPDP
   verifyCustomer: (memberNumber: string, phone: string) =>
     request<any>('/preferences/verify', {
@@ -187,9 +199,10 @@ export const api = {
   getPendingApprovals: () =>
     request<{ items: any[]; count: number }>('/admin/members/pending-approvals'),
 
-  approveMemberPayment: (memberId: number) =>
+  approveMemberPayment: (memberId: number, data?: { verified_with_bank_statement?: boolean }) =>
     request<any>(`/admin/members/${memberId}/approve-payment`, {
       method: 'POST',
+      body: JSON.stringify(data || { verified_with_bank_statement: true }),
     }),
 
   rejectMemberPayment: (memberId: number, reason?: string) =>

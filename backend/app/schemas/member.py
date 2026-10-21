@@ -109,6 +109,51 @@ class MemberResponse(BaseModel):
 class PaymentSubmissionRequest(BaseModel):
     payment_screenshot: str = Field(..., description="Base64 payment screenshot")
     payment_utr: Optional[str] = Field(None, max_length=100, description="UPI Reference / UTR number")
+    full_name: Optional[str] = Field(None, description="Customer full name")
+    primary_phone: Optional[str] = Field(None, description="Registered mobile number")
+
+
+class CustomerPaymentSubmission(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=150, description="Customer's full name")
+    primary_phone: str = Field(..., description="Registered 10-digit mobile number")
+    member_number: str = Field(..., description="Membership Application ID e.g. KAV-000001")
+    payment_utr: str = Field(..., min_length=6, max_length=100, description="UPI Reference / UTR number")
+    payment_screenshot: str = Field(..., description="Base64 encoded payment screenshot")
+
+    @field_validator("primary_phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        return normalize_indian_phone(v)
+
+    @field_validator("payment_utr")
+    @classmethod
+    def validate_utr(cls, v: str) -> str:
+        clean = v.strip().upper()
+        if len(clean) < 6:
+            raise ValueError("UTR / Reference number must be at least 6 characters.")
+        if not re.match(r"^[A-Z0-9\-_]+$", clean):
+            raise ValueError("UTR / Reference number can only contain alphanumeric characters and hyphens.")
+        return clean
+
+    @field_validator("payment_screenshot")
+    @classmethod
+    def validate_screenshot(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Payment screenshot is required.")
+        if len(v) > 15 * 1024 * 1024:
+            raise ValueError("Payment screenshot file size must be less than 10MB.")
+        if v.startswith("data:"):
+            allowed = ("data:image/jpeg;base64,", "data:image/jpg;base64,", "data:image/png;base64,", "data:image/webp;base64,")
+            if not any(v.startswith(p) for p in allowed):
+                raise ValueError("Permitted image formats for screenshot: JPEG, PNG, or WEBP only.")
+        return v
+
+
+class PaymentApprovalRequest(BaseModel):
+    verified_with_bank_statement: bool = Field(
+        True,
+        description="Confirmation that administrator verified the payment against actual bank or UPI statement"
+    )
 
 
 class PaymentRejectionRequest(BaseModel):

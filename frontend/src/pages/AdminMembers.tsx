@@ -15,6 +15,7 @@ import {
   Eye,
   CheckCircle2,
   X,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface AdminMembersProps {
@@ -37,6 +38,8 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
   const [pendingCount, setPendingCount] = useState(0);
   const [activeTab, setActiveTab] = useState<'all' | 'pending'>('all');
   const [selectedProofMember, setSelectedProofMember] = useState<any | null>(null);
+  const [memberToApprove, setMemberToApprove] = useState<any | null>(null);
+  const [verifiedWithBankStatement, setVerifiedWithBankStatement] = useState(false);
   const [memberToReject, setMemberToReject] = useState<any | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [approvingMap, setApprovingMap] = useState<Record<number, boolean>>({});
@@ -124,13 +127,25 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
     fetchPendingApprovals();
   }, [page, statusFilter]);
 
-  const handleApprovePayment = async (m: any) => {
+  const promptApprovePayment = (m: any) => {
+    setMemberToApprove(m);
+    setVerifiedWithBankStatement(false);
+  };
+
+  const handleConfirmApprovePayment = async () => {
+    if (!memberToApprove) return;
+    if (!verifiedWithBankStatement) {
+      alert("You must verify the payment against bank / UPI statement for 7353398831-2@naviaxis before approving.");
+      return;
+    }
+    const m = memberToApprove;
     setApprovingMap((prev) => ({ ...prev, [m.id]: true }));
     try {
-      await api.approveMemberPayment(m.id);
+      await api.approveMemberPayment(m.id, { verified_with_bank_statement: true });
       setApprovalNotice(
         `✓ Approved ₹${m.payment_amount || 499} payment for ${m.full_name} (${m.member_number})! Membership card unlocked and official welcome SMS dispatched.`
       );
+      setMemberToApprove(null);
       if (selectedProofMember?.id === m.id) {
         setSelectedProofMember(null);
       }
@@ -367,7 +382,7 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
                     <button
                       type="button"
                       disabled={approvingMap[m.id]}
-                      onClick={() => handleApprovePayment(m)}
+                      onClick={() => promptApprovePayment(m)}
                       className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-4 h-4 text-emerald-200" />
@@ -660,7 +675,7 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
                 <button
                   type="button"
                   disabled={approvingMap[selectedProofMember.id]}
-                  onClick={() => handleApprovePayment(selectedProofMember)}
+                  onClick={() => promptApprovePayment(selectedProofMember)}
                   className="px-5 py-2 rounded-xl text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/30 flex items-center space-x-2 cursor-pointer disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-4 h-4 text-emerald-200" />
@@ -671,6 +686,101 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
                   </span>
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Payment Approval Confirmation Modal with Mandatory Bank Reconciliation */}
+      <Modal
+        isOpen={!!memberToApprove}
+        onClose={() => setMemberToApprove(null)}
+        title="Verify & Approve ₹499 Membership Payment"
+        maxWidth="max-w-lg"
+      >
+        {memberToApprove && (
+          <div className="space-y-4">
+            <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-amber-950 text-xs space-y-1">
+              <p className="font-extrabold flex items-center space-x-1.5 text-amber-900">
+                <ShieldCheck className="w-4 h-4 text-amber-600" />
+                <span>Mandatory Bank Statement Reconciliation</span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-amber-800">
+                A payment screenshot or UTR number alone must NOT automatically count as proof. Please verify this transaction directly in your bank account or UPI app for <strong>7353398831-2@naviaxis</strong> before issuing the official membership card.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-xs space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Applicant:</span>
+                <span className="font-bold text-slate-900">{memberToApprove.full_name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Registered Phone:</span>
+                <span className="font-mono font-bold text-slate-900">
+                  +91 {memberToApprove.primary_phone?.replace(/[^0-9]/g, '').slice(-10)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Application ID:</span>
+                <span className="font-mono font-bold text-brand-900">{memberToApprove.member_number}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Payment Amount:</span>
+                <span className="font-black text-emerald-700 text-sm">₹{memberToApprove.payment_amount || 499}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">UTR / Ref Number:</span>
+                <span className="font-mono font-bold text-slate-800">{memberToApprove.payment_utr || 'Not filled'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Submission Date / Time:</span>
+                <span className="text-slate-700">
+                  {memberToApprove.payment_submitted_at
+                    ? new Date(memberToApprove.payment_submitted_at).toLocaleString('en-IN')
+                    : 'N/A'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Verification Status:</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                  Payment Verification Pending
+                </span>
+              </div>
+            </div>
+
+            {/* Reconciliation Checkbox */}
+            <label className="flex items-start space-x-3 p-3.5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 cursor-pointer hover:bg-emerald-100/50 transition-colors">
+              <input
+                type="checkbox"
+                checked={verifiedWithBankStatement}
+                onChange={(e) => setVerifiedWithBankStatement(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+              />
+              <span className="text-xs text-emerald-950 font-bold leading-relaxed select-none">
+                I have verified this transaction against actual bank / UPI statements (<strong>7353398831-2@naviaxis</strong>). ₹499 is confirmed received.
+              </span>
+            </label>
+
+            <div className="flex justify-end space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setMemberToApprove(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!verifiedWithBankStatement || approvingMap[memberToApprove.id]}
+                onClick={handleConfirmApprovePayment}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center space-x-2 cursor-pointer transition-all"
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                <span>
+                  {approvingMap[memberToApprove.id] ? 'Approving...' : 'Approve & Issue Membership Card'}
+                </span>
+              </button>
             </div>
           </div>
         )}

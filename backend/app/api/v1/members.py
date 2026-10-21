@@ -12,6 +12,7 @@ from app.schemas.member import (
     MemberResponse,
     MemberLoginRequest,
     PaymentSubmissionRequest,
+    CustomerPaymentSubmission,
 )
 from app.schemas.consent import CustomerPreferencesResponse, ConsentItem
 from app.services.consent_service import get_all_consents_for_member
@@ -89,6 +90,73 @@ async def register_new_member(
     )
 
 
+@router.post("/submit-payment")
+async def submit_customer_payment_info(
+    submission: CustomerPaymentSubmission,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Customer submits ₹499 membership payment:
+    - Validates Full Name, Registered Phone, Application ID, UTR, Screenshot.
+    - Validates image format and size limit.
+    - Flags duplicate UTRs across any other applications.
+    - Sets application status to 'Payment Verification Pending' (pending_verification).
+    - Returns required confirmation message.
+    """
+    from datetime import datetime, timezone
+    clean_id = submission.member_number.strip().upper()
+    stmt = select(Member).where(Member.member_number == clean_id)
+    res = await db.execute(stmt)
+    member = res.scalar_one_or_none()
+    if not member:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Membership application ID '{clean_id}' was not found. Please verify your Member ID.",
+        )
+
+    # Validate registered mobile number matches
+    if member.primary_phone != submission.primary_phone:
+        raise HTTPException(
+            status_code=400,
+            detail="The mobile number entered does not match the registered number for this Membership ID.",
+        )
+
+    clean_utr = submission.payment_utr.strip().upper()
+    # Check for duplicate UTR across other applications
+    dup_stmt = select(Member).where(
+        Member.payment_utr == clean_utr,
+        Member.id != member.id,
+        Member.payment_status.in_(["approved", "pending"]),
+    )
+    dup_res = await db.execute(dup_stmt)
+    existing_dup = dup_res.scalar_one_or_none()
+    if existing_dup:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Duplicate UTR flagged: Reference number '{clean_utr}' has already been submitted for another membership ({existing_dup.member_number}). Each payment requires a unique transaction reference.",
+        )
+
+    now = datetime.now(timezone.utc)
+    member.payment_screenshot = submission.payment_screenshot
+    member.payment_utr = clean_utr
+    member.payment_amount = 499
+    member.payment_status = "pending"
+    member.status = "pending_verification"
+    member.payment_submitted_at = now
+    member.rejection_reason = None
+    member.updated_at = now
+
+    await db.commit()
+    await db.refresh(member)
+
+    return {
+        "success": True,
+        "message": "Your ₹499 membership payment has been submitted for verification. Your membership card will be available after the administrator verifies and approves your payment.",
+        "member": MemberResponse.model_validate(member),
+        "status_label": "Payment Verification Pending",
+    }
+
+
 @router.post("/{member_number}/submit-payment", response_model=MemberResponse)
 async def submit_member_payment(
     member_number: str,
@@ -106,10 +174,40 @@ async def submit_member_payment(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found.")
 
+    # Validate screenshot format and size
+    screenshot = payment_data.payment_screenshot
+    if not screenshot or not screenshot.strip():
+        raise HTTPException(status_code=400, detail="Payment screenshot is required.")
+    if len(screenshot) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Screenshot file size must be less than 10MB.")
+    if screenshot.startswith("data:"):
+        allowed = ("data:image/jpeg;base64,", "data:image/jpg;base64,", "data:image/png;base64,", "data:image/webp;base64,")
+        if not any(screenshot.startswith(p) for p in allowed):
+            raise HTTPException(status_code=400, detail="Permitted image formats: JPEG, PNG, or WEBP only.")
+
+    clean_utr = payment_data.payment_utr.strip().upper() if payment_data.payment_utr else None
+    if clean_utr:
+        if len(clean_utr) < 6:
+            raise HTTPException(status_code=400, detail="UTR / Reference number must be at least 6 characters.")
+        # Duplicate check across other applications
+        dup_stmt = select(Member).where(
+            Member.payment_utr == clean_utr,
+            Member.id != member.id,
+            Member.payment_status.in_(["approved", "pending"]),
+        )
+        dup_res = await db.execute(dup_stmt)
+        existing_dup = dup_res.scalar_one_or_none()
+        if existing_dup:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duplicate UTR flagged: Reference number '{clean_utr}' has already been submitted for another membership ({existing_dup.member_number}). Each payment requires a unique transaction reference.",
+            )
+
     now = datetime.now(timezone.utc)
-    member.payment_screenshot = payment_data.payment_screenshot
-    if payment_data.payment_utr:
-        member.payment_utr = payment_data.payment_utr
+    member.payment_screenshot = screenshot
+    if clean_utr:
+        member.payment_utr = clean_utr
+    member.payment_amount = 499
     member.payment_status = "pending"
     member.status = "pending_verification"
     member.payment_submitted_at = now

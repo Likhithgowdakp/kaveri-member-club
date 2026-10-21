@@ -18,6 +18,11 @@ import {
   AlertCircle,
   Eye,
   RefreshCw,
+  Copy,
+  Check,
+  Smartphone,
+  Upload,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface CardPageProps {
@@ -132,42 +137,53 @@ export const CardPage: React.FC<CardPageProps> = ({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Store Payment Settings & UPI QR
+  const [storeUpiId, setStoreUpiId] = useState('7353398831-2@naviaxis');
+  const [membershipFee, setMembershipFee] = useState(499);
+  const [upiQrUrl, setUpiQrUrl] = useState<string>('');
+  const [copiedUpi, setCopiedUpi] = useState(false);
+
   // Payment Verification & Proof Modal State
   const [showProofModal, setShowProofModal] = useState(false);
   const [showReuploadForm, setShowReuploadForm] = useState(false);
   const [newScreenshot, setNewScreenshot] = useState<string | null>(null);
   const [newUtr, setNewUtr] = useState('');
+  const [newFullName, setNewFullName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
   const [reuploadLoading, setReuploadLoading] = useState(false);
-  const [reuploadSuccess, setReuploadSuccess] = useState(false);
+  const [submissionSuccessMsg, setSubmissionSuccessMsg] = useState<string | null>(null);
   const [reuploadError, setReuploadError] = useState<string | null>(null);
 
-  const handleReuploadSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newScreenshot) {
-      setReuploadError('Please select a payment screenshot.');
-      return;
+  useEffect(() => {
+    if (member) {
+      setNewFullName(member.full_name || '');
+      setNewPhone(member.primary_phone || '');
+      if (member.payment_utr) setNewUtr(member.payment_utr);
     }
-    setReuploadLoading(true);
-    setReuploadError(null);
-    try {
-      const updated = await api.submitMemberPayment(member.member_number, {
-        payment_screenshot: newScreenshot,
-        payment_utr: newUtr.trim() || undefined,
-      });
-      setMember(updated);
-      setReuploadSuccess(true);
-      setShowReuploadForm(false);
-      setTimeout(() => setReuploadSuccess(false), 5000);
-    } catch (err: any) {
-      setReuploadError(err?.detail || 'Failed to submit payment proof.');
-    } finally {
-      setReuploadLoading(false);
-    }
+  }, [member]);
+
+  const handleCopyUpi = () => {
+    navigator.clipboard.writeText(storeUpiId);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 3000);
   };
 
   const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    setReuploadError(null);
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type.toLowerCase())) {
+      setReuploadError('Invalid file format. Permitted screenshot image formats are JPEG, PNG, or WEBP only.');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setReuploadError('Screenshot file size must be less than 10MB.');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (loadEvent) => {
       const src = loadEvent.target?.result as string;
@@ -201,13 +217,64 @@ export const CardPage: React.FC<CardPageProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const handlePaymentProofSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!member?.member_number) {
+      setReuploadError('Membership Application ID is required.');
+      return;
+    }
+    const cleanName = (newFullName || member.full_name || '').trim();
+    if (cleanName.length < 2) {
+      setReuploadError('Please enter full name (minimum 2 characters).');
+      return;
+    }
+    const cleanPhone = (newPhone || member.primary_phone || '').trim();
+    if (!cleanPhone) {
+      setReuploadError('Registered mobile number is required.');
+      return;
+    }
+    const cleanUtr = newUtr.trim().toUpperCase();
+    if (!cleanUtr || cleanUtr.length < 6) {
+      setReuploadError('UTR / Reference number is required (min 6 alphanumeric characters).');
+      return;
+    }
+    if (!newScreenshot && !member.payment_screenshot) {
+      setReuploadError('Please select a payment screenshot showing transaction details.');
+      return;
+    }
+    const screenshotToSubmit = newScreenshot || member.payment_screenshot;
+
+    setReuploadLoading(true);
+    setReuploadError(null);
+    try {
+      const res = await api.submitCustomerPayment({
+        full_name: cleanName,
+        primary_phone: cleanPhone,
+        member_number: member.member_number,
+        payment_utr: cleanUtr,
+        payment_screenshot: screenshotToSubmit,
+      });
+      setMember(res.member);
+      setSubmissionSuccessMsg(
+        res.message ||
+          'Your ₹499 membership payment has been submitted for verification. Your membership card will be available after the administrator verifies and approves your payment.'
+      );
+      setShowReuploadForm(false);
+      setTimeout(() => setSubmissionSuccessMsg(null), 10000);
+    } catch (err: any) {
+      setReuploadError(err?.detail || 'Failed to submit payment proof.');
+    } finally {
+      setReuploadLoading(false);
+    }
+  };
+
   const cardRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
 
   const security = getCardSecurityFeatures(member);
   const currentTheme = CARD_THEMES[security.themeIndex];
 
-  // Fetch store WhatsApp group settings
+  // Fetch store WhatsApp group settings and UPI config
   useEffect(() => {
     api
       .getPublicSettings()
@@ -215,9 +282,33 @@ export const CardPage: React.FC<CardPageProps> = ({
         if (settings.whatsapp_group_url) {
           setWhatsappGroupUrl(settings.whatsapp_group_url);
         }
+        const upi = settings.store_upi_id || '7353398831-2@naviaxis';
+        const feeAmount = settings.membership_fee || 499;
+        setStoreUpiId(upi);
+        setMembershipFee(feeAmount);
+        buildUpiQr(upi, feeAmount);
       })
-      .catch(() => {});
+      .catch(() => {
+        buildUpiQr('7353398831-2@naviaxis', 499);
+      });
   }, []);
+
+  const buildUpiQr = async (pa: string, amount: number) => {
+    try {
+      const upiString = `upi://pay?pa=${pa}&pn=Kaveri%20Electronic&am=${amount}&cu=INR&tn=Kaveri%20Club%20Membership`;
+      const url = await QRCode.toDataURL(upiString, {
+        width: 300,
+        margin: 1,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff',
+        },
+      });
+      setUpiQrUrl(url);
+    } catch (e) {
+      console.error('Failed to generate UPI QR code', e);
+    }
+  };
 
   // 1. Generate Small QR code containing ALL customer details
   useEffect(() => {
@@ -345,14 +436,412 @@ export const CardPage: React.FC<CardPageProps> = ({
         </div>
       )}
 
-      {/* Confirmation & Active Membership Card */}
+      {/* Member Portal: Status Tracker & Membership Card */}
       {member && (() => {
-        const isPending = member.payment_status === 'pending' || member.status === 'pending_verification';
+        const isApproved = member.payment_status === 'approved' && member.status === 'active';
         const isRejected = member.payment_status === 'rejected';
+        const isPending = (member.payment_status === 'pending' || member.status === 'pending_verification') && !isApproved;
+        const isNotSubmitted = !isApproved && !isPending && !isRejected;
 
+        // Visual Stepper for the 5 Customer Account Statuses
+        const renderStatusTracker = () => (
+          <div className="no-print bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-xs font-black text-brand-950 uppercase tracking-wider flex items-center space-x-2">
+                  <ShieldCheck className="w-4 h-4 text-brand-700" />
+                  <span>Customer Membership Status Tracker</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Application ID: <span className="font-mono font-bold text-brand-900">{member.member_number}</span> • Name: <span className="font-bold text-slate-800">{member.full_name}</span>
+                </p>
+              </div>
+              <div className="flex items-center space-x-2 self-start sm:self-auto">
+                {isApproved && (
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center space-x-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Membership Card Available</span>
+                  </span>
+                )}
+                {isPending && (
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 animate-pulse flex items-center space-x-1">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Payment Verification Pending</span>
+                  </span>
+                )}
+                {isRejected && (
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-900 border border-rose-300 flex items-center space-x-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Payment Rejected</span>
+                  </span>
+                )}
+                {isNotSubmitted && (
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-700 border border-slate-300 flex items-center space-x-1">
+                    <Lock className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Payment Not Submitted</span>
+                  </span>
+                )}
+                <button
+                  onClick={() => setMember(null)}
+                  className="text-xs font-semibold text-slate-400 hover:text-slate-700 underline pl-2"
+                >
+                  Change ID
+                </button>
+              </div>
+            </div>
+
+            {/* 5 Status Stages Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+              {/* Stage 1: Payment Not Submitted */}
+              <div
+                className={`p-3 rounded-2xl border text-center transition-all ${
+                  isNotSubmitted
+                    ? 'bg-amber-50 border-amber-300 shadow-sm ring-2 ring-amber-300/40'
+                    : 'bg-emerald-50 border-emerald-200'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-1.5 mb-1">
+                  {isNotSubmitted ? (
+                    <span className="w-5 h-5 rounded-full bg-amber-500 text-brand-950 text-[10px] font-black flex items-center justify-center">1</span>
+                  ) : (
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  )}
+                </div>
+                <p className="text-xs font-black text-slate-900">Payment Not Submitted</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {isNotSubmitted ? 'Action: Pay ₹499' : 'Submitted'}
+                </p>
+              </div>
+
+              {/* Stage 2: Payment Verification Pending */}
+              <div
+                className={`p-3 rounded-2xl border text-center transition-all ${
+                  isPending
+                    ? 'bg-amber-50 border-amber-300 shadow-sm ring-2 ring-amber-300/40'
+                    : isApproved
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : 'bg-slate-50 border-slate-200 opacity-60'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-1.5 mb-1">
+                  {isPending ? (
+                    <Clock className="w-4 h-4 text-amber-600 animate-spin" />
+                  ) : isApproved ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center">2</span>
+                  )}
+                </div>
+                <p className="text-xs font-black text-slate-900">Payment Verification Pending</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {isPending ? 'Bank review in progress' : isApproved ? 'Verified by admin' : 'Pending upload'}
+                </p>
+              </div>
+
+              {/* Stage 3: Payment Rejected */}
+              <div
+                className={`p-3 rounded-2xl border text-center transition-all ${
+                  isRejected
+                    ? 'bg-rose-50 border-rose-300 shadow-sm ring-2 ring-rose-400/40'
+                    : 'bg-slate-50 border-slate-200 opacity-40'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-1.5 mb-1">
+                  {isRejected ? (
+                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-400 text-[10px] font-bold flex items-center justify-center">3</span>
+                  )}
+                </div>
+                <p className="text-xs font-black text-slate-900">Payment Rejected</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {isRejected ? 'Action: Re-upload proof' : 'No rejection'}
+                </p>
+              </div>
+
+              {/* Stage 4: Payment Approved */}
+              <div
+                className={`p-3 rounded-2xl border text-center transition-all ${
+                  isApproved
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : 'bg-slate-50 border-slate-200 opacity-60'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-1.5 mb-1">
+                  {isApproved ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center">4</span>
+                  )}
+                </div>
+                <p className="text-xs font-black text-slate-900">Payment Approved</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {isApproved ? 'Bank confirmed' : 'Requires admin check'}
+                </p>
+              </div>
+
+              {/* Stage 5: Membership Card Available */}
+              <div
+                className={`p-3 rounded-2xl border text-center transition-all ${
+                  isApproved
+                    ? 'bg-gradient-to-br from-amber-50 to-emerald-50 border-emerald-300 shadow-sm ring-2 ring-emerald-400/40'
+                    : 'bg-slate-50 border-slate-200 opacity-60'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-1.5 mb-1">
+                  {isApproved ? (
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-slate-400" />
+                  )}
+                </div>
+                <p className="text-xs font-black text-slate-900">Membership Card Available</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {isApproved ? 'Card Unlocked & Active' : 'Locked'}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+
+        // Reusable Payment Submission / Re-submission Component
+        const renderPaymentSubmissionForm = (title: string, subtitle: string) => (
+          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border-2 border-brand-200 space-y-6">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-brand-950 flex items-center space-x-2">
+                <Smartphone className="w-6 h-6 text-brand-700" />
+                <span>{title}</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                {subtitle}
+              </p>
+            </div>
+
+            {/* UPI Payment Box with QR and 1-tap Button */}
+            <div className="bg-gradient-to-br from-brand-950 to-indigo-950 text-white rounded-3xl p-6 shadow-xl border border-brand-800 space-y-5">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider font-extrabold text-gold-400">
+                    Kaveri Club Membership Fee
+                  </span>
+                  <p className="text-3xl font-black text-white mt-0.5">₹{membershipFee}</p>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-black bg-gold-400/20 text-gold-300 border border-gold-400/40">
+                  One-Time Official Fee
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                {/* QR Code Container */}
+                <div className="p-3 bg-white rounded-2xl shadow-lg border-2 border-gold-400/30 text-center flex-shrink-0">
+                  {upiQrUrl ? (
+                    <img
+                      src={upiQrUrl}
+                      alt={`Scan to pay ₹${membershipFee} via UPI`}
+                      className="w-40 h-40 object-contain mx-auto"
+                    />
+                  ) : (
+                    <div className="w-40 h-40 bg-slate-100 animate-pulse rounded-xl" />
+                  )}
+                  <span className="text-[10px] font-black text-slate-900 mt-1 uppercase tracking-tight block">
+                    Scan with Any UPI App
+                  </span>
+                </div>
+
+                {/* UPI ID Details & 1-Tap Pay */}
+                <div className="flex-1 space-y-3.5 text-center sm:text-left">
+                  <div>
+                    <span className="text-xs text-slate-300 block">Official Store UPI ID:</span>
+                    <div className="flex items-center justify-center sm:justify-start space-x-2 mt-1">
+                      <span className="font-mono text-base font-extrabold text-gold-300 bg-white/10 px-3 py-1.5 rounded-xl border border-white/20 select-all">
+                        {storeUpiId}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopyUpi}
+                        className="p-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-brand-950 font-bold transition-all shadow-sm cursor-pointer"
+                        title="Copy UPI ID"
+                      >
+                        {copiedUpi ? <Check className="w-4 h-4 text-emerald-950" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Open Google Pay, PhonePe, Paytm, BHIM, or Navi. Transfer <strong>₹{membershipFee}</strong> directly to <strong>{storeUpiId}</strong>, take a screenshot of the successful transaction, and submit below.
+                  </p>
+
+                  <div>
+                    <a
+                      href={`upi://pay?pa=${encodeURIComponent(storeUpiId)}&pn=Kaveri%20Electronic&am=${membershipFee}&cu=INR&tn=Kaveri%20Club%20Membership`}
+                      className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 active:scale-95 text-brand-950 font-extrabold text-xs shadow-lg transition-all cursor-pointer"
+                    >
+                      <Smartphone className="w-4 h-4" />
+                      <span>👉 Open UPI App to Pay ₹{membershipFee}</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Submission Form */}
+            <form onSubmit={handlePaymentProofSubmit} className="space-y-4 pt-2">
+              <h3 className="text-sm font-black text-brand-950 uppercase tracking-wider">
+                Submit Payment Details & Proof
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Customer Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newFullName}
+                    onChange={(e) => setNewFullName(e.target.value)}
+                    placeholder="Full name as registered"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Registered Mobile Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    placeholder="10-digit mobile number"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-semibold focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Membership Application ID <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    readOnly
+                    value={member.member_number}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-800 text-xs font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    12-Digit UPI Transaction UTR / Ref Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newUtr}
+                    onChange={(e) => setNewUtr(e.target.value.toUpperCase())}
+                    placeholder="e.g. 423984719283"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Found in your UPI payment receipt details
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Payment Screenshot Showing Transaction Details <span className="text-rose-500">*</span>
+                </label>
+                <div className="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center hover:border-brand-500 transition-colors bg-slate-50/50">
+                  <input
+                    type="file"
+                    id="payment-screenshot-input"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleScreenshotChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="payment-screenshot-input"
+                    className="cursor-pointer flex flex-col items-center space-y-2"
+                  >
+                    <Upload className="w-6 h-6 text-slate-400" />
+                    <span className="text-xs font-bold text-brand-900">
+                      {newScreenshot ? '✓ Screenshot Selected (Click to change)' : 'Click to Upload Payment Screenshot'}
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Permitted formats: JPEG, PNG, WEBP (Max 10MB)
+                    </span>
+                  </label>
+
+                  {newScreenshot && (
+                    <div className="mt-3 flex items-center justify-center">
+                      <img
+                        src={newScreenshot}
+                        alt="Screenshot Preview"
+                        className="w-24 h-24 object-cover rounded-xl border border-slate-300 shadow-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {reuploadError && (
+                <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-rose-900 text-xs font-bold flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span>{reuploadError}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={reuploadLoading}
+                className="w-full py-3.5 bg-brand-900 hover:bg-brand-800 active:scale-98 text-white font-black text-sm rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-2"
+              >
+                <CheckCircle2 className="w-4 h-4 text-gold-400" />
+                <span>
+                  {reuploadLoading ? 'Submitting Payment Proof...' : 'Submit ₹499 Payment for Verification'}
+                </span>
+              </button>
+            </form>
+          </div>
+        );
+
+        // Case 1: Payment Not Submitted
+        if (isNotSubmitted) {
+          return (
+            <div className="space-y-6">
+              {submissionSuccessMsg && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-400 text-emerald-950 text-xs sm:text-sm font-bold flex items-center space-x-3 shadow-md animate-fadeIn">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+                  <span>{submissionSuccessMsg}</span>
+                </div>
+              )}
+
+              {renderStatusTracker()}
+
+              {renderPaymentSubmissionForm(
+                'Complete Your ₹499 Membership Payment',
+                'Your registration is on file. Please pay ₹499 to activate your official digital membership card and unlock 50 welcome points.'
+              )}
+            </div>
+          );
+        }
+
+        // Case 2: Payment Verification Pending
         if (isPending) {
           return (
             <div className="space-y-6">
+              {submissionSuccessMsg && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-400 text-emerald-950 text-xs sm:text-sm font-bold flex items-center space-x-3 shadow-md animate-fadeIn">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+                  <span>{submissionSuccessMsg}</span>
+                </div>
+              )}
+
+              {renderStatusTracker()}
+
               {/* Pending Verification Banner */}
               <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-6 sm:p-8 shadow-xl shadow-amber-900/5 space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-amber-200 pb-4">
@@ -362,7 +851,7 @@ export const CardPage: React.FC<CardPageProps> = ({
                     </div>
                     <div>
                       <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
-                        ⏳ Verification in Progress
+                        ⏳ Payment Verification Pending
                       </span>
                       <h2 className="text-xl sm:text-2xl font-black text-brand-950 mt-1">
                         Application Submitted & Payment Under Review
@@ -377,13 +866,13 @@ export const CardPage: React.FC<CardPageProps> = ({
                   </button>
                 </div>
 
-                {/* Status Notice */}
+                {/* Status Notice with Exact User-Requested Text */}
                 <div className="p-4 rounded-2xl bg-white border border-amber-200 text-xs sm:text-sm text-slate-700 leading-relaxed space-y-2">
-                  <p>
-                    Namaskara <strong>{member.full_name}</strong>! Your payment of <strong>₹{member.payment_amount || 499}</strong> has been received and is currently under verification by our store administrator at Kaveri Electronic Halaguru.
+                  <p className="font-bold text-slate-900">
+                    Your ₹499 membership payment has been submitted for verification. Your membership card will be available after the administrator verifies and approves your payment.
                   </p>
                   <p className="text-slate-600 text-xs">
-                    🔒 <strong>Security Approval Rule:</strong> To prevent counterfeit cards, your digital membership card and 50 welcome loyalty points will be unlocked immediately once the store manager reviews and approves your payment screenshot. You will receive an official confirmation SMS directly on your mobile!
+                    🔒 <strong>Administrator Verification Rule:</strong> The store administrator at Kaveri Electronic Halaguru verifies every transaction against actual bank statement records for UPI ID <strong>{storeUpiId}</strong> before card activation. You will receive an official confirmation SMS directly on your phone upon approval!
                   </p>
                 </div>
 
@@ -398,19 +887,27 @@ export const CardPage: React.FC<CardPageProps> = ({
                     <p className="font-mono font-bold text-slate-900 text-sm mt-0.5">{member.primary_phone}</p>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Reference / Application ID</span>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Membership Application ID</span>
                     <p className="font-mono font-bold text-brand-900 text-sm mt-0.5">{member.member_number}</p>
                   </div>
                   <div>
                     <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Membership Fee Amount</span>
-                    <p className="font-black text-amber-700 text-sm mt-0.5">₹{member.payment_amount || 499} (One-Time)</p>
+                    <p className="font-black text-amber-700 text-sm mt-0.5">₹{member.payment_amount || membershipFee} (One-Time)</p>
                   </div>
                   {member.payment_utr && (
-                    <div className="sm:col-span-2">
+                    <div>
                       <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">UPI Transaction ID / UTR</span>
                       <p className="font-mono font-bold text-slate-800 text-xs mt-0.5">{member.payment_utr}</p>
                     </div>
                   )}
+                  <div>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Submission Date & Time</span>
+                    <p className="text-slate-700 text-xs mt-0.5">
+                      {member.payment_submitted_at
+                        ? new Date(member.payment_submitted_at).toLocaleString('en-IN')
+                        : 'Submitted today'}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Submitted Screenshot Proof */}
@@ -425,14 +922,14 @@ export const CardPage: React.FC<CardPageProps> = ({
                       />
                       <div>
                         <p className="text-xs font-bold text-slate-900">Payment Receipt Attached</p>
-                        <p className="text-[11px] text-slate-500">Submitted for manager inspection</p>
+                        <p className="text-[11px] text-slate-500">Submitted for manager verification against bank records</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       <button
                         type="button"
                         onClick={() => setShowProofModal(true)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center space-x-1"
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center space-x-1 cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>View Screenshot</span>
@@ -440,7 +937,7 @@ export const CardPage: React.FC<CardPageProps> = ({
                       <button
                         type="button"
                         onClick={() => setShowReuploadForm(!showReuploadForm)}
-                        className="px-3 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold text-xs flex items-center space-x-1"
+                        className="px-3 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold text-xs flex items-center space-x-1 cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                         <span>Update Proof</span>
@@ -449,53 +946,14 @@ export const CardPage: React.FC<CardPageProps> = ({
                   </div>
                 )}
 
-                {reuploadSuccess && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-bold flex items-center space-x-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    <span>✓ Payment proof submitted! Store manager will review it shortly.</span>
-                  </div>
-                )}
-
                 {/* Optional Re-upload Form */}
                 {showReuploadForm && (
-                  <form onSubmit={handleReuploadSubmit} className="p-4 bg-white rounded-2xl border-2 border-brand-300 space-y-3">
-                    <h4 className="text-xs font-black text-brand-950 uppercase">Update / Re-Upload Payment Screenshot</h4>
-                    <div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        required
-                        onChange={handleScreenshotChange}
-                        className="text-xs text-slate-700"
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="UPI UTR Number (Optional)"
-                        value={newUtr}
-                        onChange={(e) => setNewUtr(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
-                      />
-                    </div>
-                    {reuploadError && <p className="text-xs text-rose-600 font-bold">{reuploadError}</p>}
-                    <div className="flex space-x-2">
-                      <button
-                        type="submit"
-                        disabled={reuploadLoading}
-                        className="px-4 py-2 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl disabled:opacity-50"
-                      >
-                        {reuploadLoading ? 'Uploading...' : 'Submit New Proof'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowReuploadForm(false)}
-                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
+                  <div className="pt-2">
+                    {renderPaymentSubmissionForm(
+                      'Update / Re-Upload Payment Proof',
+                      'Submit updated transaction details or a clearer screenshot if needed.'
+                    )}
+                  </div>
                 )}
 
                 {/* Support Helpline Footer */}
@@ -522,7 +980,7 @@ export const CardPage: React.FC<CardPageProps> = ({
                   </p>
                   <a
                     href={whatsappGroupUrl}
-                    className="inline-flex items-center space-x-1.5 mt-2.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm"
+                    className="inline-flex items-center space-x-1.5 mt-2.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm cursor-pointer"
                   >
                     <MessageCircle className="w-4 h-4" />
                     <span>Join WhatsApp Group</span>
@@ -533,9 +991,19 @@ export const CardPage: React.FC<CardPageProps> = ({
           );
         }
 
+        // Case 3: Payment Rejected
         if (isRejected) {
           return (
             <div className="space-y-6">
+              {submissionSuccessMsg && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-400 text-emerald-950 text-xs sm:text-sm font-bold flex items-center space-x-3 shadow-md animate-fadeIn">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+                  <span>{submissionSuccessMsg}</span>
+                </div>
+              )}
+
+              {renderStatusTracker()}
+
               <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-6 sm:p-8 shadow-xl shadow-rose-900/5 space-y-4">
                 <div className="flex items-center space-x-3.5 text-rose-900">
                   <AlertCircle className="w-8 h-8 text-rose-600 flex-shrink-0" />
@@ -544,59 +1012,35 @@ export const CardPage: React.FC<CardPageProps> = ({
                       Payment Verification Required
                     </h2>
                     <p className="text-xs text-rose-700 mt-0.5">
-                      Your payment screenshot could not be confirmed by the store manager.
+                      Your payment submission could not be verified in store bank records.
                     </p>
                   </div>
                 </div>
 
                 {member.rejection_reason && (
                   <div className="p-3 bg-white rounded-xl border border-rose-200 text-xs text-rose-900 font-medium">
-                    <strong>Reason:</strong> {member.rejection_reason}
+                    <strong>Rejection Reason from Store Manager:</strong> {member.rejection_reason}
                   </div>
                 )}
 
                 <p className="text-xs text-slate-700">
-                  Please re-upload a clear screenshot showing the successful transfer of ₹{member.payment_amount || 499} to <strong>7204162882@ybl</strong>, or visit our store at HMS Complex, Halaguru.
+                  Please re-submit your payment details below with a clear screenshot showing the successful transfer of ₹{member.payment_amount || membershipFee} to <strong>{storeUpiId}</strong>, or visit our store at HMS Complex, Halaguru.
                 </p>
 
-                {/* Re-upload Form */}
-                <form onSubmit={handleReuploadSubmit} className="p-4 bg-white rounded-2xl border border-rose-200 space-y-3">
-                  <h4 className="text-xs font-black text-slate-900 uppercase">Upload Corrected Payment Proof</h4>
-                  <div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      required
-                      onChange={handleScreenshotChange}
-                      className="text-xs text-slate-700"
-                    />
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="12-digit UPI UTR / Transaction ID"
-                      value={newUtr}
-                      onChange={(e) => setNewUtr(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
-                    />
-                  </div>
-                  {reuploadError && <p className="text-xs text-rose-600 font-bold">{reuploadError}</p>}
-                  <button
-                    type="submit"
-                    disabled={reuploadLoading}
-                    className="px-5 py-2.5 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-md disabled:opacity-50"
-                  >
-                    {reuploadLoading ? 'Submitting...' : 'Re-Submit for Approval'}
-                  </button>
-                </form>
+                {/* Re-submission Form */}
+                {renderPaymentSubmissionForm(
+                  'Re-Submit ₹499 Payment Proof',
+                  'Provide your 12-digit UTR number and upload a clear screenshot of the completed transfer.'
+                )}
               </div>
             </div>
           );
         }
 
-        // Active Approved Member Card
+        // Case 4: Active Approved Member Card (Stage 4: Approved & Stage 5: Card Available)
         return (
           <div className="space-y-6">
+            {renderStatusTracker()}
             {/* Top Success Badge */}
             <div className="no-print bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
               <div className="flex items-center space-x-3">
