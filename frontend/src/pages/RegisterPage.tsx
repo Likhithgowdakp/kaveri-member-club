@@ -1,7 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { api, ApiError } from '../api/client';
 import { Modal } from '../components/Modal';
-import { ShieldCheck, MessageSquare, Smartphone, CheckCircle, AlertCircle, Info, Sparkles, MapPin, Lock, Eye, EyeOff } from 'lucide-react';
+import {
+  ShieldCheck,
+  MessageSquare,
+  Smartphone,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  Sparkles,
+  MapPin,
+  Lock,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
+  Upload,
+  QrCode,
+} from 'lucide-react';
 
 interface RegisterPageProps {
   onRegistrationSuccess: (memberData: any) => void;
@@ -18,7 +35,16 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
+
+  // ₹499 UPI Payment State
+  const [upiId, setUpiId] = useState('7204162882@ybl');
+  const [fee, setFee] = useState(499);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const [paymentUtr, setPaymentUtr] = useState('');
+  const [screenshotBase64, setScreenshotBase64] = useState<string | null>(null);
+  const [screenshotName, setScreenshotName] = useState('');
+
   // Consent checkboxes UNCHECKED by default
   const [consentWhatsapp, setConsentWhatsapp] = useState(false);
   const [consentSms, setConsentSms] = useState(false);
@@ -27,6 +53,84 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
+  // Load public settings to fetch live UPI ID and fee
+  useEffect(() => {
+    const fetchSettingsAndBuildQr = async () => {
+      try {
+        const settings = await api.getPublicSettings();
+        const activeUpi = settings.store_upi_id || '7204162882@ybl';
+        const activeFee = settings.membership_fee || 499;
+        setUpiId(activeUpi);
+        setFee(activeFee);
+        buildQr(activeUpi, activeFee);
+      } catch {
+        buildQr(upiId, fee);
+      }
+    };
+    fetchSettingsAndBuildQr();
+  }, []);
+
+  const buildQr = async (pa: string, amount: number) => {
+    try {
+      const upiString = `upi://pay?pa=${pa}&pn=Kaveri%20Electronic&am=${amount}&cu=INR&tn=Kaveri%20Club%20Membership`;
+      const url = await QRCode.toDataURL(upiString, {
+        width: 380,
+        margin: 1,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff',
+        },
+      });
+      setQrDataUrl(url);
+    } catch (e) {
+      console.error('Failed to generate UPI QR code', e);
+    }
+  };
+
+  const handleCopyUpi = () => {
+    navigator.clipboard.writeText(upiId);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 3000);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setScreenshotName(file.name);
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+      const src = loadEvent.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1200;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          setScreenshotBase64(canvas.toDataURL('image/jpeg', 0.85));
+        } else {
+          setScreenshotBase64(src);
+        }
+      };
+      img.onerror = () => setScreenshotBase64(src);
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +151,11 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
       return;
     }
 
+    if (!screenshotBase64) {
+      setErrorMsg(`Please upload a screenshot of your ₹${fee} UPI payment receipt to proceed with registration.`);
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await api.registerMember({
@@ -56,6 +165,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
         email: email.trim() || undefined,
         address: address.trim() || undefined,
         password: password,
+        payment_screenshot: screenshotBase64,
+        payment_utr: paymentUtr.trim() || undefined,
+        payment_amount: fee,
         consent_whatsapp: consentWhatsapp,
         consent_sms: consentSms,
         accept_privacy_notice: acceptPrivacy,
@@ -75,11 +187,18 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
-      {/* Brand Header Banner */}
+      {/* Brand Header Banner with Official 3D Logo */}
       <div className="text-center mb-8">
-        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-gold-100 text-gold-900 border border-gold-300 text-xs font-bold mb-3">
+        <div className="inline-block relative mb-4">
+          <img
+            src="/logo.png"
+            alt="Kaveri Electronic Halaguru"
+            className="w-24 h-24 sm:w-28 sm:h-28 object-contain rounded-2xl shadow-2xl border-2 border-gold-400/50 bg-slate-900/60 p-1 mx-auto"
+          />
+        </div>
+        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-gold-100 text-gold-900 border border-gold-300 text-xs font-bold mb-3 shadow-sm">
           <Sparkles className="w-3.5 h-3.5 text-gold-700" />
-          <span>Instant Digital Membership • 50 Welcome Points</span>
+          <span>Official Membership • ₹{fee} Membership Fee • 50 Welcome Points</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-brand-950 tracking-tight">
           Join Kaveri Member Club
@@ -254,6 +373,173 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
             </div>
           </div>
 
+          {/* ₹499 One-Time Membership Payment & UPI Verification */}
+          <div className="bg-gradient-to-br from-amber-50/90 via-white to-amber-50/50 rounded-3xl p-5 sm:p-7 border-2 border-amber-300 shadow-lg shadow-amber-900/5 space-y-4">
+            <div className="flex items-center justify-between border-b border-amber-200/80 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-brand-950 flex items-center justify-center font-black text-lg shadow-md">
+                  ₹
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-brand-950">
+                    Step 2: Pay Membership Fee (₹{fee})
+                  </h3>
+                  <p className="text-xs text-slate-600">
+                    One-time membership activation & permanent digital card
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-black px-3.5 py-1 rounded-full bg-gold-400 text-brand-950 border border-gold-500 shadow-sm">
+                ₹{fee} ONLY
+              </span>
+            </div>
+
+            {/* UPI QR and Copy Options */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-center pt-1">
+              {/* QR Code Container */}
+              <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl border-2 border-amber-200 shadow-inner text-center">
+                {qrDataUrl ? (
+                  <img
+                    src={qrDataUrl}
+                    alt={`Scan to Pay ₹${fee}`}
+                    className="w-48 h-48 object-contain mx-auto"
+                  />
+                ) : (
+                  <div className="w-48 h-48 bg-slate-100 animate-pulse rounded-xl" />
+                )}
+                <p className="text-xs font-black text-brand-950 mt-2 flex items-center space-x-1">
+                  <QrCode className="w-4 h-4 text-amber-600" />
+                  <span>Scan to Pay ₹{fee}</span>
+                </p>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Works with PhonePe, Google Pay, Paytm, BHIM & Any UPI App
+                </span>
+              </div>
+
+              {/* UPI ID & Direct Mobile Link */}
+              <div className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Store Official UPI ID:
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={upiId}
+                      className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-mono font-bold text-brand-950 select-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyUpi}
+                      className="px-4 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-800 active:scale-95 text-white font-bold text-xs flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer"
+                    >
+                      {copiedUpi ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-gold-400" />
+                          <span>Copy UPI ID</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Tap <strong>Copy UPI ID</strong> and paste into your UPI payment app.
+                  </p>
+                </div>
+
+                {/* 1-Tap Mobile UPI button */}
+                <a
+                  href={`upi://pay?pa=${upiId}&pn=Kaveri%20Electronic&am=${fee}&cu=INR&tn=Kaveri%20Club%20Membership`}
+                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs shadow-md flex items-center justify-center space-x-2 transition-all cursor-pointer"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Tap to Pay ₹{fee} via Installed UPI App</span>
+                </a>
+
+                {/* UTR Input */}
+                <div>
+                  <label htmlFor="paymentUtr" className="block text-xs font-bold text-slate-800 mb-1">
+                    UPI Transaction ID / UTR Number
+                  </label>
+                  <input
+                    id="paymentUtr"
+                    type="text"
+                    placeholder="e.g. 12-digit UTR from receipt"
+                    value={paymentUtr}
+                    onChange={(e) => setPaymentUtr(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 text-xs font-mono text-slate-900"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Screenshot Upload with Instant Preview */}
+            <div className="pt-3 border-t border-amber-200/80">
+              <label className="block text-xs font-bold text-slate-900 mb-1.5">
+                Upload Payment Screenshot Proof <span className="text-rose-600">*</span>
+              </label>
+
+              {!screenshotBase64 ? (
+                <label className="border-2 border-dashed border-amber-400 hover:border-amber-500 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer bg-white/90 hover:bg-white transition-all group">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-extrabold text-slate-900">
+                    Click or Drag to Upload Payment Screenshot
+                  </span>
+                  <span className="text-[11px] text-slate-500 mt-0.5">
+                    Select the screenshot confirming ₹{fee} transferred to {upiId}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+              ) : (
+                <div className="flex items-center space-x-3.5 p-3.5 bg-white rounded-2xl border-2 border-emerald-400 shadow-md">
+                  <img
+                    src={screenshotBase64}
+                    alt="Payment Proof"
+                    className="w-16 h-16 object-cover rounded-xl border border-slate-200 shadow-sm"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-extrabold text-slate-900 truncate flex items-center space-x-1">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 inline flex-shrink-0" />
+                      <span>{screenshotName || 'Payment Screenshot Attached'}</span>
+                    </p>
+                    <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                      ✓ Ready for store manager approval
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScreenshotBase64(null);
+                      setScreenshotName('');
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-slate-500 hover:text-rose-700 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+              )}
+
+              <div className="mt-2.5 p-2.5 rounded-xl bg-amber-100/70 border border-amber-300 text-[11px] text-amber-950 flex items-start space-x-2">
+                <Info className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  <strong>Verification Policy:</strong> To prevent fraud, your payment screenshot will be inspected by our store administrator. Once approved, your official Member ID and active card will be issued immediately.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Voluntary Separate Marketing Consents (DPDP Act 2023 Compliant) */}
           <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-4">
             <div className="flex items-center space-x-2">
@@ -333,14 +619,19 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 px-6 rounded-xl font-bold text-white bg-brand-900 hover:bg-brand-800 active:scale-[0.99] transition-all shadow-lg shadow-brand-900/20 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center space-x-2"
+            className="w-full py-4 px-6 rounded-2xl font-black text-white bg-gradient-to-r from-brand-950 via-brand-900 to-indigo-950 hover:from-brand-900 hover:to-indigo-900 active:scale-[0.99] transition-all shadow-xl shadow-brand-900/30 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center space-x-2.5 cursor-pointer border border-gold-400/30"
           >
             {loading ? (
-              <span>Registering Membership...</span>
+              <span className="flex items-center space-x-2">
+                <span className="animate-spin text-gold-400">⏳</span>
+                <span>Submitting Application & Payment...</span>
+              </span>
             ) : (
               <>
                 <CheckCircle className="w-5 h-5 text-gold-400" />
-                <span>Join & Generate My Membership Card</span>
+                <span className="text-base tracking-wide">
+                  Submit Application & ₹{fee} Payment Proof
+                </span>
               </>
             )}
           </button>

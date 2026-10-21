@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api, ApiError } from '../api/client';
-import { Store, UserCheck, ArrowRight, Key, Award, CheckCircle2, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react';
+import { UserCheck, ArrowRight, Key, Award, CheckCircle2, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface MemberLoginPageProps {
   onLoginSuccess: (memberData: any) => void;
@@ -62,9 +62,11 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
     <div className="max-w-md mx-auto px-4 py-8 sm:py-14">
       {/* Brand Header */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-gold-900/20">
-          <Store className="w-8 h-8 text-brand-950 font-bold" />
-        </div>
+        <img
+          src="/logo.png"
+          alt="Kaveri Electronic Halaguru"
+          className="w-20 h-20 object-contain rounded-2xl shadow-xl border-2 border-gold-400/40 bg-slate-900/60 p-1 mx-auto mb-3"
+        />
         <span className="text-xs uppercase font-extrabold px-3 py-1 rounded-full bg-gold-500/20 text-gold-700 border border-gold-500/30">
           KAVERI ELECTRONIC HALAGURU
         </span>

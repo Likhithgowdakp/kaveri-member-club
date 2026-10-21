@@ -13,12 +13,13 @@ async def test_messaging_unconfigured_dry_run_mode(
     When WhatsApp/SMS credentials are not configured, messages are NOT faked as delivered.
     They execute safely in 'dry_run' status with full audit logging.
     """
-    await client.post("/api/v1/members/register", json={
+    reg = await client.post("/api/v1/members/register", json={
         "full_name": "Dry Run Member",
         "primary_phone": "9448300001",
         "consent_whatsapp": True,
         "accept_privacy_notice": True,
     })
+    await client.post(f"/api/v1/admin/members/{reg.json()['member']['id']}/approve-payment", headers=auth_headers_owner)
 
     create_res = await client.post(
         "/api/v1/admin/campaigns/",

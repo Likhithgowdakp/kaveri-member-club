@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Store, UserCheck, LayoutDashboard, LogOut, Menu, X, Award, MessageCircle } from 'lucide-react';
+import { UserCheck, LayoutDashboard, LogOut, Menu, X, Award, MessageCircle } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
@@ -34,9 +34,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center space-x-3 cursor-pointer group"
             onClick={() => handleNav(isAdminLoggedIn ? 'admin-dashboard' : 'register')}
           >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-md shadow-gold-900/30">
-              <Store className="w-6 h-6 text-brand-950 font-bold" />
-            </div>
+            <img
+              src="/logo.png"
+              alt="Kaveri Electronic Halaguru"
+              className="w-12 h-12 object-contain rounded-xl shadow-md border border-gold-400/40 bg-slate-900/60 p-0.5 group-hover:scale-105 transition-transform"
+            />
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-xl font-extrabold tracking-tight text-white group-hover:text-gold-300 transition-colors">

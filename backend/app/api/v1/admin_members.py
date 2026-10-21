@@ -9,7 +9,7 @@ from app.models.consent import MarketingConsent, ConsentAuditLog
 from app.models.loyalty import LoyaltyTransaction
 from app.models.admin import AdminUser
 from app.models.setting import StoreSetting
-from app.schemas.member import MemberResponse, MemberUpdateRequest
+from app.schemas.member import MemberResponse, MemberUpdateRequest, PaymentRejectionRequest
 from app.security.auth import get_current_admin, require_role
 from pydantic import BaseModel
 import urllib.parse
@@ -66,6 +66,143 @@ async def list_members(
         "page": page,
         "page_size": page_size,
         "total_pages": (total_count + page_size - 1) // page_size,
+    }
+
+
+@router.get("/pending-approvals")
+async def list_pending_payment_members(
+    current_user: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List all customer membership applications awaiting ₹499 UPI payment verification and approval.
+    """
+    stmt = (
+        select(Member)
+        .where(or_(Member.payment_status == "pending", Member.status == "pending_verification"))
+        .order_by(desc(Member.id))
+    )
+    res = await db.execute(stmt)
+    members = list(res.scalars().all())
+    return {
+        "items": [MemberResponse.model_validate(m) for m in members],
+        "count": len(members),
+    }
+
+
+@router.post("/{member_id}/approve-payment")
+async def approve_member_payment(
+    member_id: int,
+    request: Request,
+    current_user: AdminUser = Depends(require_role(["owner", "manager"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Store Administrator approves ₹499 membership payment:
+    - Changes payment_status to 'approved' and status to 'active'.
+    - Activates official digital membership card.
+    - Dispatches official Welcome SMS under 'KAVERI CLUB HALAGURU'.
+    - Logs admin action in audit trail.
+    """
+    stmt = select(Member).where(Member.id == member_id)
+    res = await db.execute(stmt)
+    member = res.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found.")
+
+    now = datetime.now(timezone.utc)
+    member.payment_status = "approved"
+    member.status = "active"
+    member.payment_approved_at = now
+    member.payment_approved_by = current_user.username
+    member.rejection_reason = None
+    member.updated_at = now
+
+    await db.commit()
+    await db.refresh(member)
+
+    # Dispatch official welcome SMS under KAVERI CLUB HALAGURU
+    clean_phone = "".join(filter(str.isdigit, member.primary_phone))[-10:]
+    welcome_sms = (
+        f"Namaskara {member.full_name}! Your payment of Rs {member.payment_amount} is verified and approved. "
+        f"Welcome to KAVERI CLUB HALAGURU! Member ID: {member.member_number} ({member.loyalty_points} loyalty pts). "
+        f"Your digital card is now active! Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru."
+    )
+
+    stmt_key = select(StoreSetting).where(StoreSetting.key == "sms_api_key")
+    res_key = await db.execute(stmt_key)
+    row_key = res_key.scalar_one_or_none()
+    active_sms_key = row_key.value if row_key and row_key.value else None
+
+    stmt_sender = select(StoreSetting).where(StoreSetting.key == "sms_sender_id")
+    res_sender = await db.execute(stmt_sender)
+    row_sender = res_sender.scalar_one_or_none()
+    active_sender = row_sender.value if row_sender and row_sender.value else None
+
+    sms_provider = DLTSmsProvider(api_key=active_sms_key, sender_id=active_sender)
+    await sms_provider.send_message(
+        recipient_phone=clean_phone,
+        message_text=welcome_sms,
+    )
+
+    await log_admin_action(
+        db,
+        current_user,
+        "APPROVE_PAYMENT_AND_ISSUE_CARD",
+        "member",
+        str(member.id),
+        f"Approved ₹{member.payment_amount} payment for {member.member_number} ({member.full_name}, +91{clean_phone}). Digital membership card unlocked.",
+        get_client_ip(request),
+    )
+
+    return {
+        "success": True,
+        "message": f"Payment approved for {member.member_number} ({member.full_name}). Card activated and welcome SMS dispatched.",
+        "member": MemberResponse.model_validate(member),
+    }
+
+
+@router.post("/{member_id}/reject-payment")
+async def reject_member_payment(
+    member_id: int,
+    data: PaymentRejectionRequest,
+    request: Request,
+    current_user: AdminUser = Depends(require_role(["owner", "manager"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Store Administrator rejects a payment submission (e.g. invalid screenshot or UTR).
+    """
+    stmt = select(Member).where(Member.id == member_id)
+    res = await db.execute(stmt)
+    member = res.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found.")
+
+    reason = data.reason.strip() if data.reason and data.reason.strip() else "Payment proof could not be verified by store manager."
+    now = datetime.now(timezone.utc)
+    member.payment_status = "rejected"
+    member.status = "rejected"
+    member.rejection_reason = reason
+    member.updated_at = now
+
+    await db.commit()
+    await db.refresh(member)
+
+    await log_admin_action(
+        db,
+        current_user,
+        "REJECT_PAYMENT",
+        "member",
+        str(member.id),
+        f"Rejected ₹{member.payment_amount} payment for {member.member_number} ({member.full_name}): {reason}",
+        get_client_ip(request),
+    )
+
+    return {
+        "success": True,
+        "message": f"Payment submission rejected for {member.member_number}. Customer can re-upload screenshot.",
+        "member": MemberResponse.model_validate(member),
     }
 
 

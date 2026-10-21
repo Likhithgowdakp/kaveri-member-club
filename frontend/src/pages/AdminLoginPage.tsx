@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { Modal } from '../components/Modal';
-import { ShieldCheck, Lock, User, AlertCircle, KeyRound } from 'lucide-react';
+import { Lock, User, AlertCircle, KeyRound } from 'lucide-react';
 
 interface AdminLoginPageProps {
   onLoginSuccess: (user: any) => void;
@@ -86,9 +86,11 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
     <div className="max-w-md mx-auto px-4 py-12 sm:py-16">
       <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-100">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-900 to-brand-950 text-gold-400 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-brand-950/20">
-            <ShieldCheck className="w-8 h-8" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Kaveri Electronic Halaguru"
+            className="w-16 h-16 object-contain rounded-2xl shadow-xl border-2 border-gold-400/40 bg-slate-900/60 p-1 mx-auto mb-3"
+          />
           <h1 className="text-2xl font-black text-brand-950">Store Administration</h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">
             Kaveri Electronic Halaguru • Authorized Staff & Owner Portal

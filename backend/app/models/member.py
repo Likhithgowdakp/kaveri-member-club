@@ -20,9 +20,20 @@ class Member(Base):
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)  # active, suspended, closed
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)  # active, pending_verification, suspended, closed
     loyalty_points: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # ₹499 Membership Payment & Admin Approval
+    payment_status: Mapped[str] = mapped_column(String(30), default="approved", nullable=False)  # pending, approved, rejected
+    payment_amount: Mapped[int] = mapped_column(Integer, default=499, nullable=False)
+    payment_screenshot: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # base64 data URL
+    payment_utr: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # UPI reference / transaction ID
+    payment_submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    payment_approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    payment_approved_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False

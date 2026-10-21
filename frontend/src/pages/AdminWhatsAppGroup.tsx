@@ -8,7 +8,6 @@ import {
   Copy,
   CheckCircle,
   QrCode,
-  Store,
   Sparkles,
   Users,
   Smartphone,
@@ -32,6 +31,13 @@ export const AdminWhatsAppGroup: React.FC = () => {
   const [smsError, setSmsError] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
 
+  // UPI Payment Settings
+  const [upiId, setUpiId] = useState('7204162882@ybl');
+  const [membershipFee, setMembershipFee] = useState(499);
+  const [upiSavedSuccess, setUpiSavedSuccess] = useState(false);
+  const [upiLoading, setUpiLoading] = useState(false);
+  const [upiError, setUpiError] = useState<string | null>(null);
+
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,6 +54,9 @@ export const AdminWhatsAppGroup: React.FC = () => {
       } else {
         generateQr(groupUrl);
       }
+
+      if (data.store_upi_id) setUpiId(data.store_upi_id);
+      if (data.membership_fee) setMembershipFee(data.membership_fee);
 
       if (data.sms_api_key_configured) {
         setSmsConfigured(true);
@@ -81,6 +90,26 @@ export const AdminWhatsAppGroup: React.FC = () => {
       setSmsError(err.detail || 'Failed to update SMS gateway settings');
     } finally {
       setSmsLoading(false);
+    }
+  };
+
+  const handleSaveUpi = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpiLoading(true);
+    setUpiError(null);
+    setUpiSavedSuccess(false);
+
+    try {
+      await api.updateAdminSettings({
+        store_upi_id: upiId.trim(),
+        membership_fee: Number(membershipFee) || 499,
+      });
+      setUpiSavedSuccess(true);
+      setTimeout(() => setUpiSavedSuccess(false), 4000);
+    } catch (err: any) {
+      setUpiError(err.detail || 'Failed to update UPI settings');
+    } finally {
+      setUpiLoading(false);
     }
   };
 
@@ -378,6 +407,74 @@ export const AdminWhatsAppGroup: React.FC = () => {
               </div>
             </form>
           </div>
+
+          {/* Card 3: ₹499 UPI Payment Settings */}
+          <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/80 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-base font-extrabold text-brand-950 flex items-center space-x-2">
+                <span className="text-amber-500 font-black text-lg">₹</span>
+                <span>UPI Payment & Membership Fee</span>
+              </h2>
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                ₹{membershipFee}
+              </span>
+            </div>
+
+            {upiSavedSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center space-x-2">
+                <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>UPI configuration saved successfully!</span>
+              </div>
+            )}
+
+            {upiError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+                {upiError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveUpi} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Store Official UPI ID (Displayed to Customers)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 7204162882@ybl"
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 text-xs font-mono"
+                  required
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Customers pay to this UPI ID and upload the receipt screenshot for your approval.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Membership Fee (₹ INR)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={membershipFee}
+                  onChange={(e) => setMembershipFee(Number(e.target.value) || 0)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 text-xs font-bold"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={upiLoading}
+                className="px-5 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs shadow-md transition-all flex items-center space-x-2 cursor-pointer"
+              >
+                <Save className="w-4 h-4 text-gold-400" />
+                <span>{upiLoading ? 'Saving...' : 'Save UPI Settings'}</span>
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Right: Counter-Printable Standee Poster */}
@@ -395,11 +492,13 @@ export const AdminWhatsAppGroup: React.FC = () => {
             ref={printRef}
             className="bg-white border-4 border-brand-900 rounded-3xl p-6 sm:p-8 shadow-2xl text-center relative overflow-hidden"
           >
-            {/* Top Store Header */}
+            {/* Top Store Header with Official 3D Logo */}
             <div className="border-b-2 border-brand-900 pb-4 mb-4">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 text-brand-950 shadow-md mb-2">
-                <Store className="w-7 h-7" />
-              </div>
+              <img
+                src="/logo.png"
+                alt="Kaveri Electronic Halaguru"
+                className="w-16 h-16 object-contain rounded-2xl shadow-md border-2 border-gold-400/50 bg-slate-900/60 p-0.5 mx-auto mb-2"
+              />
               <h2 className="text-xl sm:text-2xl font-black text-brand-950 tracking-tight">
                 KAVERI ELECTRONIC
               </h2>

@@ -11,6 +11,7 @@ from app.schemas.member import (
     MemberRegistrationResult,
     MemberResponse,
     MemberLoginRequest,
+    PaymentSubmissionRequest,
 )
 from app.schemas.consent import CustomerPreferencesResponse, ConsentItem
 from app.services.consent_service import get_all_consents_for_member
@@ -52,17 +53,27 @@ async def register_new_member(
         user_agent=user_agent,
     )
 
-    welcome_msg = (
-        f"Congratulations {member.full_name}! You are now an official member of Kaveri Member Club. "
-        f"Your Membership ID is {member.member_number}. You have received {settings.REGISTRATION_BONUS_POINTS} welcome points!"
-    )
+    if member.payment_status == "pending":
+        welcome_msg = (
+            f"Thank you {member.full_name}! Your application for Kaveri Member Club and ₹{member.payment_amount} payment verification have been submitted. "
+            f"Reference ID: {member.member_number}. Once the store administrator approves your payment screenshot, your official membership card will be activated!"
+        )
+        sms_text = (
+            f"Namaskara {member.full_name}! We received your Kaveri Member Club application (Ref: {member.member_number}) with Rs {member.payment_amount} payment details. "
+            f"Store admin is verifying your payment. Once approved, your active card will be issued. Kaveri Electronic Halaguru."
+        )
+    else:
+        welcome_msg = (
+            f"Congratulations {member.full_name}! You are now an official member of Kaveri Member Club. "
+            f"Your Membership ID is {member.member_number}. You have received {settings.REGISTRATION_BONUS_POINTS} welcome points!"
+        )
+        sms_text = (
+            f"Namaskara {member.full_name}! Welcome to KAVERI CLUB HALAGURU. "
+            f"Your Member ID is {member.member_number} with {settings.REGISTRATION_BONUS_POINTS} loyalty points. "
+            f"Redeem instant discounts on TVs & home appliances at Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri."
+        )
 
-    # Automatically dispatch welcome SMS directly from the Kaveri App to the registered phone number
-    sms_text = (
-        f"Namaskara {member.full_name}! Welcome to KAVERI CLUB HALAGURU. "
-        f"Your Member ID is {member.member_number} with {settings.REGISTRATION_BONUS_POINTS} loyalty points. "
-        f"Redeem instant discounts on TVs & home appliances at Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri."
-    )
+    # Automatically dispatch registration notification SMS directly from the Kaveri App to the registered phone number
     sms_provider = DLTSmsProvider()
     await sms_provider.send_message(
         recipient_phone=member.primary_phone,
@@ -76,6 +87,38 @@ async def register_new_member(
         whatsapp_group_url=settings.BUSINESS_WHATSAPP_GROUP_URL,
         welcome_message=welcome_msg,
     )
+
+
+@router.post("/{member_number}/submit-payment", response_model=MemberResponse)
+async def submit_member_payment(
+    member_number: str,
+    payment_data: PaymentSubmissionRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Allows a customer to upload or re-submit their ₹499 UPI payment screenshot and UTR.
+    Moves status to pending_verification for admin review.
+    """
+    from datetime import datetime, timezone
+    stmt = select(Member).where(Member.member_number == member_number.strip().upper())
+    res = await db.execute(stmt)
+    member = res.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found.")
+
+    now = datetime.now(timezone.utc)
+    member.payment_screenshot = payment_data.payment_screenshot
+    if payment_data.payment_utr:
+        member.payment_utr = payment_data.payment_utr
+    member.payment_status = "pending"
+    member.status = "pending_verification"
+    member.payment_submitted_at = now
+    member.rejection_reason = None
+    member.updated_at = now
+
+    await db.commit()
+    await db.refresh(member)
+    return MemberResponse.model_validate(member)
 
 
 @router.get("/{member_number}/card", response_model=MemberResponse)

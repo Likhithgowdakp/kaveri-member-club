@@ -58,6 +58,9 @@ export const api = {
     consent_whatsapp: boolean;
     consent_sms: boolean;
     accept_privacy_notice: boolean;
+    payment_screenshot?: string;
+    payment_utr?: string;
+    payment_amount?: number;
   }) => request<any>('/members/register', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -71,6 +74,12 @@ export const api = {
 
   getMemberCard: (memberNumber: string) =>
     request<any>(`/members/${encodeURIComponent(memberNumber)}/card`),
+
+  submitMemberPayment: (memberNumber: string, data: { payment_screenshot: string; payment_utr?: string }) =>
+    request<any>(`/members/${encodeURIComponent(memberNumber)}/submit-payment`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // Customer Preferences & DPDP
   verifyCustomer: (memberNumber: string, phone: string) =>
@@ -175,6 +184,20 @@ export const api = {
       method: 'DELETE',
     }),
 
+  getPendingApprovals: () =>
+    request<{ items: any[]; count: number }>('/admin/members/pending-approvals'),
+
+  approveMemberPayment: (memberId: number) =>
+    request<any>(`/admin/members/${memberId}/approve-payment`, {
+      method: 'POST',
+    }),
+
+  rejectMemberPayment: (memberId: number, reason?: string) =>
+    request<any>(`/admin/members/${memberId}/reject-payment`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
   sendAppSms: (memberId: number, message: string) =>
     request<any>(`/admin/members/${memberId}/send-app-sms`, {
       method: 'POST',
@@ -234,6 +257,8 @@ export const api = {
     welcome_message_template?: string;
     sms_api_key?: string;
     sms_sender_id?: string;
+    store_upi_id?: string;
+    membership_fee?: number;
   }) =>
     request<any>('/settings/admin', {
       method: 'POST',

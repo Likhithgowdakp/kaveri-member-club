@@ -2,11 +2,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import { api, ApiError } from '../api/client';
+import { Modal } from '../components/Modal';
 import {
   Award,
   Printer,
   Download,
-  Store,
   MessageCircle,
   MapPin,
   CheckCircle,
@@ -14,6 +14,10 @@ import {
   ShieldCheck,
   Lock,
   Sparkles,
+  Clock,
+  AlertCircle,
+  Eye,
+  RefreshCw,
 } from 'lucide-react';
 
 interface CardPageProps {
@@ -127,6 +131,75 @@ export const CardPage: React.FC<CardPageProps> = ({
   const [whatsappGroupUrl, setWhatsappGroupUrl] = useState('https://chat.whatsapp.com/KaveriClubOfficial');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Payment Verification & Proof Modal State
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [showReuploadForm, setShowReuploadForm] = useState(false);
+  const [newScreenshot, setNewScreenshot] = useState<string | null>(null);
+  const [newUtr, setNewUtr] = useState('');
+  const [reuploadLoading, setReuploadLoading] = useState(false);
+  const [reuploadSuccess, setReuploadSuccess] = useState(false);
+  const [reuploadError, setReuploadError] = useState<string | null>(null);
+
+  const handleReuploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newScreenshot) {
+      setReuploadError('Please select a payment screenshot.');
+      return;
+    }
+    setReuploadLoading(true);
+    setReuploadError(null);
+    try {
+      const updated = await api.submitMemberPayment(member.member_number, {
+        payment_screenshot: newScreenshot,
+        payment_utr: newUtr.trim() || undefined,
+      });
+      setMember(updated);
+      setReuploadSuccess(true);
+      setShowReuploadForm(false);
+      setTimeout(() => setReuploadSuccess(false), 5000);
+    } catch (err: any) {
+      setReuploadError(err?.detail || 'Failed to submit payment proof.');
+    } finally {
+      setReuploadLoading(false);
+    }
+  };
+
+  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+      const src = loadEvent.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1200;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          setNewScreenshot(canvas.toDataURL('image/jpeg', 0.85));
+        } else {
+          setNewScreenshot(src);
+        }
+      };
+      img.onerror = () => setNewScreenshot(src);
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const cardRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
@@ -273,99 +346,349 @@ export const CardPage: React.FC<CardPageProps> = ({
       )}
 
       {/* Confirmation & Active Membership Card */}
-      {member && (
-        <div className="space-y-6">
-          {/* Top Success Badge */}
-          <div className="no-print bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <CheckCircle className="w-6 h-6 text-emerald-600 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-bold text-emerald-950">
-                  Official Membership Confirmed!
-                </p>
-                <p className="text-xs text-emerald-700">
-                  Welcome points: <span className="font-bold">{member.loyalty_points || 50} pts</span> active • Tamper-proof digital seal verified.
-                </p>
+      {member && (() => {
+        const isPending = member.payment_status === 'pending' || member.status === 'pending_verification';
+        const isRejected = member.payment_status === 'rejected';
+
+        if (isPending) {
+          return (
+            <div className="space-y-6">
+              {/* Pending Verification Banner */}
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-6 sm:p-8 shadow-xl shadow-amber-900/5 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-amber-200 pb-4">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500 text-brand-950 flex items-center justify-center shadow-md">
+                      <Clock className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                        ⏳ Verification in Progress
+                      </span>
+                      <h2 className="text-xl sm:text-2xl font-black text-brand-950 mt-1">
+                        Application Submitted & Payment Under Review
+                      </h2>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setMember(null)}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline self-start sm:self-center"
+                  >
+                    Look up another
+                  </button>
+                </div>
+
+                {/* Status Notice */}
+                <div className="p-4 rounded-2xl bg-white border border-amber-200 text-xs sm:text-sm text-slate-700 leading-relaxed space-y-2">
+                  <p>
+                    Namaskara <strong>{member.full_name}</strong>! Your payment of <strong>₹{member.payment_amount || 499}</strong> has been received and is currently under verification by our store administrator at Kaveri Electronic Halaguru.
+                  </p>
+                  <p className="text-slate-600 text-xs">
+                    🔒 <strong>Security Approval Rule:</strong> To prevent counterfeit cards, your digital membership card and 50 welcome loyalty points will be unlocked immediately once the store manager reviews and approves your payment screenshot. You will receive an official confirmation SMS directly on your mobile!
+                  </p>
+                </div>
+
+                {/* Application Details Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/80 rounded-2xl p-4 border border-amber-200/80 text-xs">
+                  <div>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Applicant Name</span>
+                    <p className="font-extrabold text-slate-900 text-sm mt-0.5">{member.full_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Registered Phone</span>
+                    <p className="font-mono font-bold text-slate-900 text-sm mt-0.5">{member.primary_phone}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Reference / Application ID</span>
+                    <p className="font-mono font-bold text-brand-900 text-sm mt-0.5">{member.member_number}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Membership Fee Amount</span>
+                    <p className="font-black text-amber-700 text-sm mt-0.5">₹{member.payment_amount || 499} (One-Time)</p>
+                  </div>
+                  {member.payment_utr && (
+                    <div className="sm:col-span-2">
+                      <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">UPI Transaction ID / UTR</span>
+                      <p className="font-mono font-bold text-slate-800 text-xs mt-0.5">{member.payment_utr}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submitted Screenshot Proof */}
+                {member.payment_screenshot && (
+                  <div className="bg-white rounded-2xl p-4 border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center space-x-3">
+                      <img
+                        src={member.payment_screenshot}
+                        alt="Payment Receipt Preview"
+                        className="w-16 h-16 object-cover rounded-xl border border-slate-200 cursor-pointer shadow-sm hover:opacity-90"
+                        onClick={() => setShowProofModal(true)}
+                      />
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">Payment Receipt Attached</p>
+                        <p className="text-[11px] text-slate-500">Submitted for manager inspection</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowProofModal(true)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center space-x-1"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View Screenshot</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowReuploadForm(!showReuploadForm)}
+                        className="px-3 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold text-xs flex items-center space-x-1"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Update Proof</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {reuploadSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-bold flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>✓ Payment proof submitted! Store manager will review it shortly.</span>
+                  </div>
+                )}
+
+                {/* Optional Re-upload Form */}
+                {showReuploadForm && (
+                  <form onSubmit={handleReuploadSubmit} className="p-4 bg-white rounded-2xl border-2 border-brand-300 space-y-3">
+                    <h4 className="text-xs font-black text-brand-950 uppercase">Update / Re-Upload Payment Screenshot</h4>
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        required
+                        onChange={handleScreenshotChange}
+                        className="text-xs text-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="UPI UTR Number (Optional)"
+                        value={newUtr}
+                        onChange={(e) => setNewUtr(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                      />
+                    </div>
+                    {reuploadError && <p className="text-xs text-rose-600 font-bold">{reuploadError}</p>}
+                    <div className="flex space-x-2">
+                      <button
+                        type="submit"
+                        disabled={reuploadLoading}
+                        className="px-4 py-2 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl disabled:opacity-50"
+                      >
+                        {reuploadLoading ? 'Uploading...' : 'Submit New Proof'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowReuploadForm(false)}
+                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Support Helpline Footer */}
+                <div className="pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-600 gap-2">
+                  <span className="flex items-center space-x-1">
+                    <MapPin className="w-3.5 h-3.5 text-brand-700" />
+                    <span>HMS Complex, Kanakapura Main Road, Halaguru</span>
+                  </span>
+                  <span>Store Helpline: <strong>+91 72041 62882</strong></span>
+                </div>
+              </div>
+
+              {/* WhatsApp Community Invitation */}
+              <div className="no-print bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-5 flex items-start space-x-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-emerald-950">
+                    Join Kaveri Member Club WhatsApp Group
+                  </h4>
+                  <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
+                    While your payment is being verified, join our WhatsApp group for store updates and festival discounts!
+                  </p>
+                  <a
+                    href={whatsappGroupUrl}
+                    className="inline-flex items-center space-x-1.5 mt-2.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Join WhatsApp Group</span>
+                  </a>
+                </div>
               </div>
             </div>
-            <button
-              onClick={() => setMember(null)}
-              className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline"
-            >
-              Look up another
-            </button>
-          </div>
+          );
+        }
 
-          {/* Printable Anti-Counterfeit Digital Membership Card */}
-          {/* Printable Anti-Counterfeit Digital Membership Card */}
-          <div
-            id="membership-card-print"
-            ref={cardRef}
-            className={`relative bg-gradient-to-br ${currentTheme.gradient} text-white rounded-3xl p-6 sm:p-8 print:p-8 shadow-2xl border-2 ${currentTheme.border} overflow-hidden`}
-          >
-            {/* Mathematical Guilloche Anti-Counterfeit Security Watermark */}
-            <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden">
-              <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <pattern
-                    id={`guilloche-${member.id}`}
-                    width={security.guillocheStep * 4}
-                    height={security.guillocheStep * 4}
-                    patternUnits="userSpaceOnUse"
-                  >
-                    <path
-                      d={`M0 ${security.guillocheStep} Q${security.guillocheStep} 0, ${security.guillocheStep * 2} ${security.guillocheStep} T${security.guillocheStep * 4} ${security.guillocheStep} M0 ${security.guillocheStep * 3} Q${security.guillocheStep} ${security.guillocheStep * 2}, ${security.guillocheStep * 2} ${security.guillocheStep * 3} T${security.guillocheStep * 4} ${security.guillocheStep * 3}`}
-                      fill="none"
-                      stroke={currentTheme.rosetteColor}
-                      strokeWidth="1.2"
-                    />
-                    <circle
-                      cx={security.guillocheStep * 2}
-                      cy={security.guillocheStep * 2}
-                      r={security.guillocheStep}
-                      fill="none"
-                      stroke={currentTheme.rosetteColor}
-                      strokeWidth="0.8"
-                    />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill={`url(#guilloche-${member.id})`} />
-              </svg>
-            </div>
-
-            {/* Micro-print Security Ribbon along top edge */}
-            <div className="text-[8px] font-mono tracking-wider text-slate-300 uppercase mb-3 select-none border-b border-white/15 pb-1.5 print:whitespace-normal print:break-all">
-              AUTHENTIC MEMBER • KAVERI ELECTRONIC HALAGURU • HMS COMPLEX KANAKAPURA MAIN RD • TOKEN: {security.token} • CRC-{security.securityHash} • NON-TRANSFERABLE
-            </div>
-
-            {/* Card Header */}
-            <div className="flex items-start justify-between relative z-10 border-b border-white/15 pb-4 print:pb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-brand-950 shadow-md">
-                  <Store className="w-6 h-6" />
+        if (isRejected) {
+          return (
+            <div className="space-y-6">
+              <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-6 sm:p-8 shadow-xl shadow-rose-900/5 space-y-4">
+                <div className="flex items-center space-x-3.5 text-rose-900">
+                  <AlertCircle className="w-8 h-8 text-rose-600 flex-shrink-0" />
+                  <div>
+                    <h2 className="text-xl font-black text-rose-950">
+                      Payment Verification Required
+                    </h2>
+                    <p className="text-xs text-rose-700 mt-0.5">
+                      Your payment screenshot could not be confirmed by the store manager.
+                    </p>
+                  </div>
                 </div>
+
+                {member.rejection_reason && (
+                  <div className="p-3 bg-white rounded-xl border border-rose-200 text-xs text-rose-900 font-medium">
+                    <strong>Reason:</strong> {member.rejection_reason}
+                  </div>
+                )}
+
+                <p className="text-xs text-slate-700">
+                  Please re-upload a clear screenshot showing the successful transfer of ₹{member.payment_amount || 499} to <strong>7204162882@ybl</strong>, or visit our store at HMS Complex, Halaguru.
+                </p>
+
+                {/* Re-upload Form */}
+                <form onSubmit={handleReuploadSubmit} className="p-4 bg-white rounded-2xl border border-rose-200 space-y-3">
+                  <h4 className="text-xs font-black text-slate-900 uppercase">Upload Corrected Payment Proof</h4>
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      required
+                      onChange={handleScreenshotChange}
+                      className="text-xs text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="12-digit UPI UTR / Transaction ID"
+                      value={newUtr}
+                      onChange={(e) => setNewUtr(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                    />
+                  </div>
+                  {reuploadError && <p className="text-xs text-rose-600 font-bold">{reuploadError}</p>}
+                  <button
+                    type="submit"
+                    disabled={reuploadLoading}
+                    className="px-5 py-2.5 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-md disabled:opacity-50"
+                  >
+                    {reuploadLoading ? 'Submitting...' : 'Re-Submit for Approval'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          );
+        }
+
+        // Active Approved Member Card
+        return (
+          <div className="space-y-6">
+            {/* Top Success Badge */}
+            <div className="no-print bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <CheckCircle className="w-6 h-6 text-emerald-600 flex-shrink-0" />
                 <div>
-                  <h3 className="font-extrabold tracking-tight text-lg text-white">
-                    KAVERI ELECTRONIC
-                  </h3>
-                  <p className="text-xs text-gold-400 font-bold uppercase tracking-wider">
-                    HALAGURU • MEMBER CLUB
+                  <p className="text-sm font-bold text-emerald-950">
+                    Official Membership Active & Verified!
+                  </p>
+                  <p className="text-xs text-emerald-700">
+                    Welcome points: <span className="font-bold">{member.loyalty_points || 50} pts</span> active • Tamper-proof digital seal verified.
                   </p>
                 </div>
               </div>
+              <button
+                onClick={() => setMember(null)}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline"
+              >
+                Look up another
+              </button>
+            </div>
 
-              {/* Dynamic Laser Hologram / Tamper-Proof Authenticity Seal */}
-              <div className="text-right flex flex-col items-end">
-                <div className="inline-flex items-center space-x-1 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-gradient-to-r from-amber-400/30 via-rose-400/30 to-emerald-400/30 text-white border border-white/30 shadow-sm backdrop-blur-sm">
-                  <Sparkles className="w-3 h-3 text-gold-300 animate-spin" />
-                  <span>{currentTheme.name}</span>
+            {/* Printable Anti-Counterfeit Digital Membership Card */}
+            <div
+              id="membership-card-print"
+              ref={cardRef}
+              className={`relative bg-gradient-to-br ${currentTheme.gradient} text-white rounded-3xl p-6 sm:p-8 print:p-8 shadow-2xl border-2 ${currentTheme.border} overflow-hidden`}
+            >
+              {/* Mathematical Guilloche Anti-Counterfeit Security Watermark */}
+              <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden">
+                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <pattern
+                      id={`guilloche-${member.id}`}
+                      width={security.guillocheStep * 4}
+                      height={security.guillocheStep * 4}
+                      patternUnits="userSpaceOnUse"
+                    >
+                      <path
+                        d={`M0 ${security.guillocheStep} Q${security.guillocheStep} 0, ${security.guillocheStep * 2} ${security.guillocheStep} T${security.guillocheStep * 4} ${security.guillocheStep} M0 ${security.guillocheStep * 3} Q${security.guillocheStep} ${security.guillocheStep * 2}, ${security.guillocheStep * 2} ${security.guillocheStep * 3} T${security.guillocheStep * 4} ${security.guillocheStep * 3}`}
+                        fill="none"
+                        stroke={currentTheme.rosetteColor}
+                        strokeWidth="1.2"
+                      />
+                      <circle
+                        cx={security.guillocheStep * 2}
+                        cy={security.guillocheStep * 2}
+                        r={security.guillocheStep}
+                        fill="none"
+                        stroke={currentTheme.rosetteColor}
+                        strokeWidth="0.8"
+                      />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill={`url(#guilloche-${member.id})`} />
+                </svg>
+              </div>
+
+              {/* Micro-print Security Ribbon along top edge */}
+              <div className="text-[8px] font-mono tracking-wider text-slate-300 uppercase mb-3 select-none border-b border-white/15 pb-1.5 print:whitespace-normal print:break-all">
+                AUTHENTIC MEMBER • KAVERI ELECTRONIC HALAGURU • HMS COMPLEX KANAKAPURA MAIN RD • TOKEN: {security.token} • CRC-{security.securityHash} • NON-TRANSFERABLE
+              </div>
+
+              {/* Card Header with Official 3D Logo */}
+              <div className="flex items-start justify-between relative z-10 border-b border-white/15 pb-4 print:pb-4">
+                <div className="flex items-center space-x-3">
+                  <img
+                    src="/logo.png"
+                    alt="Kaveri Electronic"
+                    className="w-12 h-12 object-contain rounded-xl shadow-md border border-gold-400/40 bg-slate-900/60 p-0.5"
+                  />
+                  <div>
+                    <h3 className="font-extrabold tracking-tight text-lg text-white">
+                      KAVERI ELECTRONIC
+                    </h3>
+                    <p className="text-xs text-gold-400 font-bold uppercase tracking-wider">
+                      HALAGURU • MEMBER CLUB
+                    </p>
+                  </div>
                 </div>
-                <div className="mt-1 flex items-center space-x-1 text-[9px] font-mono font-bold text-emerald-300">
-                  <Lock className="w-2.5 h-2.5" />
-                  <span>SEAL: {security.token}</span>
+
+                {/* Dynamic Laser Hologram / Tamper-Proof Authenticity Seal */}
+                <div className="text-right flex flex-col items-end">
+                  <div className="inline-flex items-center space-x-1 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-gradient-to-r from-amber-400/30 via-rose-400/30 to-emerald-400/30 text-white border border-white/30 shadow-sm backdrop-blur-sm">
+                    <Sparkles className="w-3 h-3 text-gold-300 animate-spin" />
+                    <span>{currentTheme.name}</span>
+                  </div>
+                  <div className="mt-1 flex items-center space-x-1 text-[9px] font-mono font-bold text-emerald-300">
+                    <Lock className="w-2.5 h-2.5" />
+                    <span>SEAL: {security.token}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
             {/* Card Body: Member Details + Small Full-Details QR Code */}
             <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-6 print:gap-4 my-5 print:my-4 relative z-10 items-center">
@@ -537,7 +860,36 @@ export const CardPage: React.FC<CardPageProps> = ({
             </div>
           </div>
         </div>
-      )}
+      );
+    })()}
+
+      {/* Payment Screenshot Modal */}
+      <Modal
+        isOpen={showProofModal}
+        onClose={() => setShowProofModal(false)}
+        title="Payment Receipt Screenshot"
+        maxWidth="max-w-xl"
+      >
+        <div className="space-y-4 text-center">
+          {member?.payment_screenshot ? (
+            <img
+              src={member.payment_screenshot}
+              alt="Payment Screenshot Full"
+              className="max-h-[75vh] w-auto mx-auto object-contain rounded-2xl shadow-lg border border-slate-200"
+            />
+          ) : (
+            <p className="text-xs text-slate-500">No screenshot preview available.</p>
+          )}
+          <div className="pt-2 flex justify-end">
+            <button
+              onClick={() => setShowProofModal(false)}
+              className="px-4 py-2 bg-brand-900 text-white rounded-xl text-xs font-bold cursor-pointer hover:bg-brand-800"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -13,7 +13,7 @@ import { AdminCampaigns } from './pages/AdminCampaigns';
 import { AdminAuditLogs } from './pages/AdminAuditLogs';
 import { AdminWhatsAppGroup } from './pages/AdminWhatsAppGroup';
 import { api } from './api/client';
-import { Store, ShieldCheck, ShieldAlert, Phone, MapPin, Mail } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Phone, MapPin, Mail } from 'lucide-react';
 
 // Protected Route Guard for Admin views
 const ProtectedAdminRoute: React.FC<{
@@ -387,8 +387,12 @@ export const App: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             {/* Store Details */}
             <div>
-              <div className="flex items-center space-x-2 text-white font-extrabold text-sm mb-2">
-                <Store className="w-4 h-4 text-gold-400" />
+              <div className="flex items-center space-x-2.5 text-white font-extrabold text-sm mb-2">
+                <img
+                  src="/logo.png"
+                  alt="Kaveri Electronic"
+                  className="w-7 h-7 object-contain rounded-lg shadow-sm border border-gold-400/30"
+                />
                 <span>KAVERI ELECTRONIC HALAGURU</span>
               </div>
               <p className="text-slate-400 text-xs leading-relaxed">

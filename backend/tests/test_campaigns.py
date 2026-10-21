@@ -11,20 +11,23 @@ async def test_campaign_creation_and_preview(
 ):
     """Admin creates and previews a campaign targeting opted-in members."""
     # Register 2 members: 1 WhatsApp only, 1 both
-    await client.post("/api/v1/members/register", json={
+    r1 = await client.post("/api/v1/members/register", json={
         "full_name": "Member One",
         "primary_phone": "9448200001",
         "consent_whatsapp": True,
         "consent_sms": False,
         "accept_privacy_notice": True,
     })
-    await client.post("/api/v1/members/register", json={
+    await client.post(f"/api/v1/admin/members/{r1.json()['member']['id']}/approve-payment", headers=auth_headers_owner)
+
+    r2 = await client.post("/api/v1/members/register", json={
         "full_name": "Member Two",
         "primary_phone": "9448200002",
         "consent_whatsapp": True,
         "consent_sms": True,
         "accept_privacy_notice": True,
     })
+    await client.post(f"/api/v1/admin/members/{r2.json()['member']['id']}/approve-payment", headers=auth_headers_owner)
 
     # Preview WhatsApp campaign
     preview_res = await client.post(
@@ -62,7 +65,9 @@ async def test_pre_send_consent_withdrawal_skips_message(
         "consent_sms": False,
         "accept_privacy_notice": True,
     })
+    m_id = reg.json()["member"]["id"]
     m_num = reg.json()["member"]["member_number"]
+    await client.post(f"/api/v1/admin/members/{m_id}/approve-payment", headers=auth_headers_owner)
 
     # 2. Create campaign
     create_res = await client.post(

@@ -44,6 +44,11 @@ class MemberRegisterRequest(BaseModel):
     address: Optional[str] = Field(None, max_length=500, description="Optional address or area")
     password: Optional[str] = Field(None, min_length=4, max_length=100, description="Customer password for portal login")
     
+    # ₹499 Membership Payment details
+    payment_screenshot: Optional[str] = Field(None, description="Base64 encoded payment screenshot")
+    payment_utr: Optional[str] = Field(None, max_length=100, description="UPI Reference / UTR Number")
+    payment_amount: int = Field(499, description="Membership fee in INR")
+    
     # Voluntary separate marketing consent (unchecked by default)
     consent_whatsapp: bool = Field(False, description="Voluntary consent for WhatsApp promotional offers")
     consent_sms: bool = Field(False, description="Voluntary consent for SMS promotional offers")
@@ -89,9 +94,25 @@ class MemberResponse(BaseModel):
     address: Optional[str] = None
     status: str
     loyalty_points: int
+    payment_status: Optional[str] = "approved"
+    payment_amount: Optional[int] = 499
+    payment_screenshot: Optional[str] = None
+    payment_utr: Optional[str] = None
+    payment_submitted_at: Optional[datetime] = None
+    payment_approved_at: Optional[datetime] = None
+    rejection_reason: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PaymentSubmissionRequest(BaseModel):
+    payment_screenshot: str = Field(..., description="Base64 payment screenshot")
+    payment_utr: Optional[str] = Field(None, max_length=100, description="UPI Reference / UTR number")
+
+
+class PaymentRejectionRequest(BaseModel):
+    reason: Optional[str] = Field(None, description="Reason for rejecting payment")
 
 
 class MemberRegistrationResult(BaseModel):

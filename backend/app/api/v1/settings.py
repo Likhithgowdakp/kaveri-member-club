@@ -19,22 +19,28 @@ class StoreSettingsUpdate(BaseModel):
     welcome_message_template: Optional[str] = None
     sms_api_key: Optional[str] = None
     sms_sender_id: Optional[str] = None
+    store_upi_id: Optional[str] = None
+    membership_fee: Optional[int] = None
 
 
 @router.get("/public")
 async def get_public_settings(db: AsyncSession = Depends(get_db)):
-    """Public endpoint to fetch store identity and WhatsApp group link."""
-    # Check if custom whatsapp_group_url is saved in DB
-    stmt = select(StoreSetting).where(StoreSetting.key == "whatsapp_group_url")
+    """Public endpoint to fetch store identity, UPI payment config, and WhatsApp group link."""
+    stmt = select(StoreSetting)
     res = await db.execute(stmt)
-    wa_setting = res.scalar_one_or_none()
-    group_url = wa_setting.value if wa_setting else settings.BUSINESS_WHATSAPP_GROUP_URL
+    saved = {s.key: s.value for s in res.scalars().all()}
+
+    group_url = saved.get("whatsapp_group_url", settings.BUSINESS_WHATSAPP_GROUP_URL)
+    store_upi = saved.get("store_upi_id", "7204162882@ybl")
+    fee_val = int(saved.get("membership_fee", "499"))
 
     return {
         "business_name": settings.BUSINESS_NAME,
         "business_address": settings.BUSINESS_ADDRESS,
-        "business_phone": settings.BUSINESS_PHONE,
+        "business_phone": saved.get("business_phone", settings.BUSINESS_PHONE),
         "whatsapp_group_url": group_url,
+        "store_upi_id": store_upi,
+        "membership_fee": fee_val,
     }
 
 
@@ -43,7 +49,7 @@ async def get_admin_settings(
     current_user: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin endpoint to view current store preferences and SMS gateway config."""
+    """Admin endpoint to view current store preferences, UPI ID, and SMS gateway config."""
     stmt = select(StoreSetting)
     res = await db.execute(stmt)
     saved_settings = {s.key: s.value for s in res.scalars().all()}
@@ -66,6 +72,8 @@ async def get_admin_settings(
         "sms_api_key_configured": bool(saved_sms_key and saved_sms_key.strip()),
         "sms_api_key_masked": masked_sms_key,
         "sms_sender_id": saved_settings.get("sms_sender_id", settings.SMS_SENDER_ID or "KAVERI"),
+        "store_upi_id": saved_settings.get("store_upi_id", "7204162882@ybl"),
+        "membership_fee": int(saved_settings.get("membership_fee", "499")),
     }
 
 
@@ -168,5 +176,42 @@ async def update_admin_settings(
                     )
                 )
 
+    if update_data.store_upi_id is not None:
+        upi_val = update_data.store_upi_id.strip()
+        if upi_val:
+            stmt = select(StoreSetting).where(StoreSetting.key == "store_upi_id")
+            res = await db.execute(stmt)
+            setting = res.scalar_one_or_none()
+            if setting:
+                setting.value = upi_val
+                setting.updated_at = now
+            else:
+                db.add(
+                    StoreSetting(
+                        key="store_upi_id",
+                        value=upi_val,
+                        description="Store official UPI ID for ₹499 membership payments",
+                        updated_at=now,
+                    )
+                )
+
+    if update_data.membership_fee is not None:
+        fee_val = str(update_data.membership_fee)
+        stmt = select(StoreSetting).where(StoreSetting.key == "membership_fee")
+        res = await db.execute(stmt)
+        setting = res.scalar_one_or_none()
+        if setting:
+            setting.value = fee_val
+            setting.updated_at = now
+        else:
+            db.add(
+                StoreSetting(
+                    key="membership_fee",
+                    value=fee_val,
+                    description="Official Membership Fee in INR",
+                    updated_at=now,
+                )
+            )
+
     await db.commit()
-    return {"message": "Store, WhatsApp, and SMS settings saved successfully."}
+    return {"message": "Store, UPI payment, WhatsApp, and SMS settings saved successfully."}
