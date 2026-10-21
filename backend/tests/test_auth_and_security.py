@@ -86,3 +86,28 @@ async def test_login_rate_limiting(client: AsyncClient, admin_owner: AdminUser):
         "password": "WrongPassword!",
     })
     assert blocked_res.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_admin_endpoints_rejected(client: AsyncClient):
+    """Verify that unauthenticated visitors cannot access protected admin data or APIs."""
+    endpoints = [
+        "/api/v1/dashboard/stats",
+        "/api/v1/admin/members/",
+        "/api/v1/admin/audit/",
+        "/api/v1/auth/me",
+        "/api/v1/settings/admin",
+    ]
+    for endpoint in endpoints:
+        res = await client.get(endpoint)
+        assert res.status_code == 401, f"Expected 401 for {endpoint}, got {res.status_code}"
+        assert "Not authenticated. Admin login required." in res.json().get("detail", "")
+
+
+@pytest.mark.asyncio
+async def test_forged_admin_token_rejected(client: AsyncClient):
+    """Verify that forged or malformed tokens cannot gain administrative privileges."""
+    forged_headers = {"Authorization": "Bearer fake.tampered.jwttoken"}
+    res = await client.get("/api/v1/dashboard/stats", headers=forged_headers)
+    assert res.status_code == 401
+

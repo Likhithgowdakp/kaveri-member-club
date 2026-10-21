@@ -13,7 +13,82 @@ import { AdminCampaigns } from './pages/AdminCampaigns';
 import { AdminAuditLogs } from './pages/AdminAuditLogs';
 import { AdminWhatsAppGroup } from './pages/AdminWhatsAppGroup';
 import { api } from './api/client';
-import { Store, ShieldCheck, Phone, MapPin, Mail } from 'lucide-react';
+import { Store, ShieldCheck, ShieldAlert, Phone, MapPin, Mail } from 'lucide-react';
+
+// Protected Route Guard for Admin views
+const ProtectedAdminRoute: React.FC<{
+  adminUser: any;
+  onRedirectToLogin: () => void;
+  children: React.ReactNode;
+}> = ({ adminUser, onRedirectToLogin, children }) => {
+  useEffect(() => {
+    if (!adminUser) {
+      onRedirectToLogin();
+    }
+  }, [adminUser, onRedirectToLogin]);
+
+  if (!adminUser) {
+    return (
+      <div className="max-w-md mx-auto py-16 px-4 text-center">
+        <div className="p-8 bg-white rounded-3xl shadow-xl border border-rose-200">
+          <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-black text-slate-900 mb-2">Access Denied</h2>
+          <p className="text-xs text-slate-600 mb-6 leading-relaxed">
+            Administrative privileges required. Please sign in with authorized store credentials.
+          </p>
+          <button
+            onClick={onRedirectToLogin}
+            className="w-full py-2.5 px-4 bg-brand-900 hover:bg-brand-800 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+          >
+            Go to Admin Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+};
+
+// Route parser supporting dedicated private admin access routes (/admin/login, #admin/login)
+const parseRoute = (user: any): string => {
+  const pathname = window.location.pathname.toLowerCase();
+  const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+
+  // 1. Private Admin Routes (non-advertised URL)
+  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
+  const isAdminHash = hash === 'admin' || hash.startsWith('admin/') || hash === 'admin-login';
+
+  if (isAdminPath || isAdminHash) {
+    if (user) {
+      if (pathname.includes('/members') || hash.includes('members')) return 'admin-members';
+      if (pathname.includes('/campaigns') || hash.includes('campaigns')) return 'admin-campaigns';
+      if (pathname.includes('/whatsapp') || hash.includes('whatsapp')) return 'admin-whatsapp';
+      if (pathname.includes('/audit') || hash.includes('audit')) return 'admin-audit';
+      return 'admin-dashboard';
+    }
+    // Unauthenticated visitors always land on admin login
+    return 'admin-login';
+  }
+
+  // 2. Public and customer routes
+  if (pathname.startsWith('/login') || hash === 'login' || hash === 'member-login') {
+    return 'member-login';
+  }
+  if (pathname.startsWith('/card') || hash === 'card') {
+    return 'card';
+  }
+  if (pathname.startsWith('/preferences') || hash.startsWith('preferences')) {
+    return 'preferences';
+  }
+  if (pathname.startsWith('/privacy') || hash === 'privacy') {
+    return 'privacy';
+  }
+
+  return 'register';
+};
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('register');
@@ -24,64 +99,117 @@ export const App: React.FC = () => {
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [prefMemberNumber, setPrefMemberNumber] = useState<string>('');
 
-  // Check stored sessions on mount
+  // Check stored sessions and verify with server on mount
   useEffect(() => {
-    // 1. Admin session
-    const storedUser = localStorage.getItem('kaveri_admin_user');
-    const token = localStorage.getItem('kaveri_admin_token');
-    if (storedUser && token) {
-      try {
-        setAdminUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem('kaveri_admin_user');
+    const initSessions = async () => {
+      // 1. Member session
+      const storedMember = localStorage.getItem('kaveri_member_session');
+      if (storedMember) {
+        try {
+          setLoggedInMember(JSON.parse(storedMember));
+        } catch {
+          localStorage.removeItem('kaveri_member_session');
+        }
       }
-    }
 
-    // 2. Member session
-    const storedMember = localStorage.getItem('kaveri_member_session');
-    if (storedMember) {
-      try {
-        const parsed = JSON.parse(storedMember);
-        setLoggedInMember(parsed);
-      } catch {
-        localStorage.removeItem('kaveri_member_session');
-      }
-    }
+      // 2. Admin session: verify with backend /auth/me
+      const token = localStorage.getItem('kaveri_admin_token');
+      const storedUser = localStorage.getItem('kaveri_admin_user');
+      let verifiedAdmin = null;
 
-    // Handle hash route
-    const hash = window.location.hash.replace('#', '');
-    if (hash.startsWith('preferences')) {
-      const params = new URLSearchParams(hash.split('?')[1] || '');
-      const id = params.get('id');
-      if (id) {
-        setPrefMemberNumber(id);
+      if (token && storedUser) {
+        try {
+          const profile = await api.getAdminProfile();
+          verifiedAdmin = profile;
+          setAdminUser(profile);
+          localStorage.setItem('kaveri_admin_user', JSON.stringify(profile));
+        } catch {
+          // Token invalid, expired, or manipulated
+          localStorage.removeItem('kaveri_admin_token');
+          localStorage.removeItem('kaveri_admin_user');
+          setAdminUser(null);
+        }
       }
-      setCurrentTab('preferences');
-    } else if (hash === 'login' || hash === 'member-login') {
-      setCurrentTab('member-login');
-    } else if (hash === 'admin' || hash === 'admin-login') {
-      setCurrentTab(storedUser && token ? 'admin-dashboard' : 'admin-login');
-    }
+
+      // Check URL parameters for preferences
+      const hashRaw = window.location.hash.replace('#', '');
+      if (hashRaw.startsWith('preferences')) {
+        const params = new URLSearchParams(hashRaw.split('?')[1] || '');
+        const id = params.get('id');
+        if (id) {
+          setPrefMemberNumber(id);
+        }
+      }
+
+      const initialTab = parseRoute(verifiedAdmin);
+      setCurrentTab(initialTab);
+    };
+
+    initSessions();
+
+    const handleUrlChange = () => {
+      const storedUser = localStorage.getItem('kaveri_admin_user');
+      const token = localStorage.getItem('kaveri_admin_token');
+      let userObj = null;
+      if (token && storedUser) {
+        try {
+          userObj = JSON.parse(storedUser);
+        } catch {
+          userObj = null;
+        }
+      }
+      const tab = parseRoute(userObj);
+      setCurrentTab(tab);
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
   }, []);
+
+  const navigateTo = (tab: string) => {
+    setCurrentTab(tab);
+    if (tab === 'admin-login') {
+      window.history.pushState(null, '', '/admin/login');
+    } else if (tab === 'admin-dashboard') {
+      window.history.pushState(null, '', '/admin/dashboard');
+    } else if (tab.startsWith('admin-')) {
+      const sub = tab.replace('admin-', '');
+      window.history.pushState(null, '', `/admin/${sub}`);
+    } else if (tab === 'register') {
+      window.history.pushState(null, '', '/#register');
+    } else if (tab === 'member-login') {
+      window.history.pushState(null, '', '/#login');
+    } else if (tab === 'card') {
+      window.history.pushState(null, '', '/#card');
+    } else if (tab === 'preferences') {
+      window.history.pushState(null, '', '/#preferences');
+    } else if (tab === 'privacy') {
+      window.history.pushState(null, '', '/#privacy');
+    }
+  };
 
   const handleAdminLogout = async () => {
     await api.adminLogout();
     setAdminUser(null);
-    setCurrentTab('register');
+    navigateTo('register');
   };
 
   const handleMemberLogin = (memberData: any) => {
     setLoggedInMember(memberData);
     setJustLoggedOut(false);
     setRegisteredMemberData({ member: memberData });
-    setCurrentTab('card');
+    navigateTo('card');
   };
 
   const handleMemberLogout = () => {
     localStorage.removeItem('kaveri_member_session');
     setLoggedInMember(null);
     setJustLoggedOut(true);
-    setCurrentTab('member-login');
+    navigateTo('member-login');
   };
 
   const handleRegistrationSuccess = (result: any) => {
@@ -90,17 +218,17 @@ export const App: React.FC = () => {
       setLoggedInMember(result.member);
       localStorage.setItem('kaveri_member_session', JSON.stringify(result.member));
     }
-    setCurrentTab('card');
+    navigateTo('card');
   };
 
   const handleNavigateToPreferences = (memberNumber: string) => {
     setPrefMemberNumber(memberNumber);
-    setCurrentTab('preferences');
+    navigateTo('preferences');
   };
 
   const handleSelectMember = (memberId: number) => {
     setSelectedMemberId(memberId);
-    setCurrentTab('admin-member-detail');
+    navigateTo('admin-member-detail');
   };
 
   return (
@@ -108,7 +236,7 @@ export const App: React.FC = () => {
       {/* Navigation */}
       <Navbar
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        setCurrentTab={navigateTo}
         isAdminLoggedIn={!!adminUser}
         onAdminLogout={handleAdminLogout}
         loggedInMember={loggedInMember}
@@ -124,7 +252,7 @@ export const App: React.FC = () => {
         {currentTab === 'member-login' && (
           <MemberLoginPage
             onLoginSuccess={handleMemberLogin}
-            onNavigateToRegister={() => setCurrentTab('register')}
+            onNavigateToRegister={() => navigateTo('register')}
             justLoggedOut={justLoggedOut}
           />
         )}
@@ -134,7 +262,7 @@ export const App: React.FC = () => {
             initialMemberData={registeredMemberData}
             loggedInMember={loggedInMember}
             onNavigateToPreferences={handleNavigateToPreferences}
-            onNavigateToLogin={() => setCurrentTab('member-login')}
+            onNavigateToLogin={() => navigateTo('member-login')}
           />
         )}
 
@@ -143,7 +271,7 @@ export const App: React.FC = () => {
             initialMemberNumber={prefMemberNumber}
             loggedInMember={loggedInMember}
             onMemberLogout={handleMemberLogout}
-            onNavigateToLogin={() => setCurrentTab('member-login')}
+            onNavigateToLogin={() => navigateTo('member-login')}
           />
         )}
 
@@ -153,31 +281,49 @@ export const App: React.FC = () => {
           <AdminLoginPage
             onLoginSuccess={(user) => {
               setAdminUser(user);
-              setCurrentTab('admin-dashboard');
+              navigateTo('admin-dashboard');
             }}
           />
         )}
 
         {currentTab === 'admin-dashboard' && (
-          <AdminDashboard onNavigate={(tab) => setCurrentTab(tab)} />
+          <ProtectedAdminRoute adminUser={adminUser} onRedirectToLogin={() => navigateTo('admin-login')}>
+            <AdminDashboard onNavigate={(tab) => navigateTo(tab)} />
+          </ProtectedAdminRoute>
         )}
 
         {currentTab === 'admin-members' && (
-          <AdminMembers onSelectMember={handleSelectMember} />
+          <ProtectedAdminRoute adminUser={adminUser} onRedirectToLogin={() => navigateTo('admin-login')}>
+            <AdminMembers onSelectMember={handleSelectMember} />
+          </ProtectedAdminRoute>
         )}
 
         {currentTab === 'admin-member-detail' && selectedMemberId && (
-          <AdminMemberDetail
-            memberId={selectedMemberId}
-            onBack={() => setCurrentTab('admin-members')}
-          />
+          <ProtectedAdminRoute adminUser={adminUser} onRedirectToLogin={() => navigateTo('admin-login')}>
+            <AdminMemberDetail
+              memberId={selectedMemberId}
+              onBack={() => navigateTo('admin-members')}
+            />
+          </ProtectedAdminRoute>
         )}
 
-        {currentTab === 'admin-campaigns' && <AdminCampaigns />}
+        {currentTab === 'admin-campaigns' && (
+          <ProtectedAdminRoute adminUser={adminUser} onRedirectToLogin={() => navigateTo('admin-login')}>
+            <AdminCampaigns />
+          </ProtectedAdminRoute>
+        )}
 
-        {currentTab === 'admin-whatsapp' && <AdminWhatsAppGroup />}
+        {currentTab === 'admin-whatsapp' && (
+          <ProtectedAdminRoute adminUser={adminUser} onRedirectToLogin={() => navigateTo('admin-login')}>
+            <AdminWhatsAppGroup />
+          </ProtectedAdminRoute>
+        )}
 
-        {currentTab === 'admin-audit' && <AdminAuditLogs />}
+        {currentTab === 'admin-audit' && (
+          <ProtectedAdminRoute adminUser={adminUser} onRedirectToLogin={() => navigateTo('admin-login')}>
+            <AdminAuditLogs />
+          </ProtectedAdminRoute>
+        )}
       </main>
 
       {/* Store Footer */}
@@ -206,22 +352,22 @@ export const App: React.FC = () => {
               </h4>
               <ul className="space-y-2 text-xs">
                 <li>
-                  <button onClick={() => setCurrentTab('register')} className="hover:text-white transition-colors">
+                  <button onClick={() => navigateTo('register')} className="hover:text-white transition-colors">
                     Register as Member (50 Welcome Points)
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => setCurrentTab('member-login')} className="hover:text-gold-400 font-bold transition-colors">
+                  <button onClick={() => navigateTo('member-login')} className="hover:text-gold-400 font-bold transition-colors">
                     Member Sign In / ಲಾಗಿನ್
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => setCurrentTab('preferences')} className="hover:text-white transition-colors">
+                  <button onClick={() => navigateTo('preferences')} className="hover:text-white transition-colors">
                     Communication Preferences & Opt-Out
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => setCurrentTab('privacy')} className="hover:text-white transition-colors">
+                  <button onClick={() => navigateTo('privacy')} className="hover:text-white transition-colors">
                     DPDP Act Privacy Policy & Notice
                   </button>
                 </li>

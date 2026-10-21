@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Store, ShieldCheck, UserCheck, LayoutDashboard, LogOut, Menu, X, Award, MessageCircle } from 'lucide-react';
+import { Store, UserCheck, LayoutDashboard, LogOut, Menu, X, Award, MessageCircle } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
@@ -149,14 +149,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   Privacy
                 </button>
-                <div className="h-6 w-px bg-brand-800 mx-2" />
-                <button
-                  onClick={() => handleNav('admin-login')}
-                  className="px-3.5 py-2 rounded-lg text-sm font-semibold bg-gold-600 hover:bg-gold-500 text-brand-950 shadow-sm transition-all flex items-center space-x-1.5"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Admin Portal</span>
-                </button>
               </>
             ) : (
               <>
@@ -294,12 +286,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="w-full text-left px-3 py-2 rounded-lg text-sm text-brand-300 hover:bg-brand-900"
               >
                 Privacy Notice (DPDP Act)
-              </button>
-              <button
-                onClick={() => handleNav('admin-login')}
-                className="w-full mt-2 text-center px-4 py-2.5 rounded-lg text-base font-bold bg-slate-800 text-gold-400 hover:bg-slate-700"
-              >
-                Admin Portal
               </button>
             </>
           ) : (
