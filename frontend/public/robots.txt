@@ -6,4 +6,4 @@ Allow: /#preferences
 Allow: /#privacy
 Disallow: /#admin
 
-Sitemap: https://guitar-paths-mentioned-created.trycloudflare.com/sitemap.xml
+Sitemap: https://lime-paint-winter-answering.trycloudflare.com/sitemap.xml
