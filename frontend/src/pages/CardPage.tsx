@@ -268,6 +268,62 @@ export const CardPage: React.FC<CardPageProps> = ({
     }
   };
 
+  // Real-time approval auto-polling: instantly updates customer view when admin approves
+  const [justApprovedNotice, setJustApprovedNotice] = useState(false);
+  const [pollingStatus, setPollingStatus] = useState(false);
+
+  const refreshMemberStatus = async () => {
+    if (!member?.member_number) return;
+    try {
+      setPollingStatus(true);
+      const updated = await api.getMemberCard(member.member_number);
+      if (updated) {
+        const wasPending =
+          member.payment_status === 'pending' ||
+          member.status === 'pending_verification' ||
+          member.payment_status === 'not_submitted';
+        const nowApproved =
+          updated.payment_status === 'approved' || updated.status === 'active';
+
+        if (wasPending && nowApproved) {
+          setJustApprovedNotice(true);
+        }
+        setMember(updated);
+
+        // Update local session storage if member is signed in
+        const stored = localStorage.getItem('kaveri_member_session');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed.member_number === updated.member_number) {
+              localStorage.setItem('kaveri_member_session', JSON.stringify(updated));
+            }
+          } catch {
+            // Ignore
+          }
+        }
+      }
+    } catch {
+      // Ignore background poll errors
+    } finally {
+      setPollingStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!member?.member_number) return;
+    const isPending =
+      member.payment_status === 'pending' || member.status === 'pending_verification';
+    if (!isPending) return;
+
+    // Check automatically every 3.5 seconds while payment verification is pending
+    const interval = setInterval(() => {
+      refreshMemberStatus();
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [member?.member_number, member?.payment_status, member?.status]);
+
   const cardRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
 
@@ -876,6 +932,28 @@ export const CardPage: React.FC<CardPageProps> = ({
                   </p>
                 </div>
 
+                {/* Live Auto-Sync Status Banner */}
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 shadow-sm">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="relative flex h-3 w-3 flex-shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    </span>
+                    <span className="font-semibold text-slate-800">
+                      ⚡ <strong>Live Auto-Sync Active:</strong> Checking admin approval every 3.5s. When the admin approves your payment, your card will unlock automatically right here!
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={refreshMemberStatus}
+                    disabled={pollingStatus}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50 flex-shrink-0"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${pollingStatus ? 'animate-spin' : ''}`} />
+                    <span>{pollingStatus ? 'Checking...' : 'Check Status Now'}</span>
+                  </button>
+                </div>
+
                 {/* Application Details Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/80 rounded-2xl p-4 border border-amber-200/80 text-xs">
                   <div>
@@ -1040,6 +1118,33 @@ export const CardPage: React.FC<CardPageProps> = ({
         // Case 4: Active Approved Member Card (Stage 4: Approved & Stage 5: Card Available)
         return (
           <div className="space-y-6">
+            {/* Real-Time Immediate Approval Celebration Banner */}
+            {(justApprovedNotice || member.payment_status === 'approved' || member.status === 'active') && (
+              <div className="no-print bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-2xl p-5 shadow-xl border-2 border-emerald-300 animate-fadeIn flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center space-x-3.5">
+                  <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 text-2xl shadow-inner">
+                    🎉
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2.5 py-0.5 bg-emerald-400 text-emerald-950 font-black text-[10px] uppercase tracking-wider rounded-md">
+                        {justApprovedNotice ? 'Just Approved by Admin!' : 'Instant Approval'}
+                      </span>
+                      <h3 className="text-base sm:text-lg font-black text-white tracking-wide">
+                        Admin has approved your request!
+                      </h3>
+                    </div>
+                    <p className="text-emerald-100 text-xs sm:text-sm font-medium mt-1 leading-relaxed">
+                      Your ₹499 payment is successful and your official membership card is <strong>UNLOCKED</strong>! Thank you for joining Kaveri Member Club.
+                    </p>
+                  </div>
+                </div>
+                <span className="px-3.5 py-1.5 bg-white text-emerald-900 text-xs font-black uppercase rounded-xl shadow-md flex-shrink-0 tracking-wider">
+                  ✓ Card Unlocked
+                </span>
+              </div>
+            )}
+
             {renderStatusTracker()}
             {/* Top Success Badge */}
             <div className="no-print bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
