@@ -42,6 +42,7 @@ class MemberRegisterRequest(BaseModel):
     alt_phone: Optional[str] = Field(None, description="Optional secondary phone number")
     email: Optional[EmailStr] = Field(None, description="Optional email address")
     address: Optional[str] = Field(None, max_length=500, description="Optional address or area")
+    password: Optional[str] = Field(None, min_length=4, max_length=100, description="Customer password for portal login")
     
     # Voluntary separate marketing consent (unchecked by default)
     consent_whatsapp: bool = Field(False, description="Voluntary consent for WhatsApp promotional offers")
@@ -109,6 +110,11 @@ class MemberVerifyRequest(BaseModel):
     @classmethod
     def validate_phone(cls, v: str) -> str:
         return normalize_indian_phone(v)
+
+
+class MemberLoginRequest(BaseModel):
+    member_identifier: str = Field(..., min_length=2, description="Member ID (e.g. KAV-000001) or registered mobile number")
+    password: str = Field(..., min_length=1, description="Account password")
 
 
 class MemberUpdateRequest(BaseModel):

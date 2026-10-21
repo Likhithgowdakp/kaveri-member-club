@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api, ApiError } from '../api/client';
-import { Store, UserCheck, ArrowRight, Smartphone, Key, Award, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Store, UserCheck, ArrowRight, Key, Award, CheckCircle2, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface MemberLoginPageProps {
   onLoginSuccess: (memberData: any) => void;
@@ -13,8 +13,9 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
   onNavigateToRegister,
   justLoggedOut = false,
 }) => {
-  const [memberNumber, setMemberNumber] = useState('');
-  const [phone, setPhone] = useState('');
+  const [memberIdentifier, setMemberIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [noticeMsg, setNoticeMsg] = useState<string | null>(
@@ -23,8 +24,8 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone.trim() || !memberNumber.trim()) {
-      setErrorMsg('Please enter both your registered mobile number and Member ID.');
+    if (!memberIdentifier.trim() || !password) {
+      setErrorMsg('Please enter both your Member ID and Password.');
       return;
     }
 
@@ -33,14 +34,19 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
     setNoticeMsg(null);
 
     try {
-      const data = await api.verifyCustomer(memberNumber.trim().toUpperCase(), phone.trim());
+      const data = await api.memberLogin({
+        member_identifier: memberIdentifier.trim(),
+        password: password,
+      });
       // Save session
       localStorage.setItem('kaveri_member_session', JSON.stringify(data));
       onLoginSuccess(data);
     } catch (err: any) {
       if (err instanceof ApiError) {
-        if (err.status === 404) {
-          setErrorMsg('No matching member record found. Please verify your Member ID (e.g. KAV-000001) and registered phone number.');
+        if (err.status === 401) {
+          setErrorMsg('Invalid Member ID or Password. Please check your credentials and try again.');
+        } else if (err.status === 403) {
+          setErrorMsg(err.detail || 'Access restricted. Please contact Kaveri Electronic store.');
         } else {
           setErrorMsg(err.detail || 'Login failed. Please check your credentials.');
         }
@@ -66,7 +72,7 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
           Member Sign In
         </h1>
         <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-          Access your digital loyalty card, points balance, and preferences. Enter your registered mobile number and Member ID.
+          Access your digital loyalty card, points balance, and exclusive member discounts with your Member ID and Password.
         </p>
       </div>
 
@@ -89,55 +95,58 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center space-x-1.5">
-              <Smartphone className="w-3.5 h-3.5 text-brand-700" />
-              <span>Registered Mobile Number *</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">
-                +91
-              </span>
-              <input
-                type="tel"
-                inputMode="tel"
-                required
-                maxLength={10}
-                placeholder="10-digit mobile number"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                className="w-full pl-14 pr-4 py-3 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-2 focus:ring-brand-200 text-sm font-medium tracking-wide"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center space-x-1.5">
               <Key className="w-3.5 h-3.5 text-brand-700" />
-              <span>Kaveri Member ID *</span>
+              <span>Kaveri Member ID or Mobile Number *</span>
             </label>
             <input
               type="text"
               required
-              placeholder="e.g. KAV-000001"
-              value={memberNumber}
-              onChange={(e) => setMemberNumber(e.target.value.toUpperCase())}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-2 focus:ring-brand-200 font-mono uppercase text-sm tracking-wide"
+              placeholder="e.g. KAV-000001 or 9845123456"
+              value={memberIdentifier}
+              onChange={(e) => setMemberIdentifier(e.target.value.toUpperCase())}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-2 focus:ring-brand-200 uppercase text-sm tracking-wide font-medium"
             />
             <p className="text-[11px] text-slate-500 mt-1">
-              Your Member ID was sent via SMS and shown on your registration card.
+              Your Member ID was issued at registration and sent to your phone via SMS.
             </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center space-x-1.5">
+              <Lock className="w-3.5 h-3.5 text-brand-700" />
+              <span>Password *</span>
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                placeholder="Enter your account password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-11 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-2 focus:ring-brand-200 text-sm tracking-wide font-medium"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-brand-900 hover:bg-brand-800 transition-all shadow-md shadow-brand-950/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center space-x-2 text-sm"
+            className="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-brand-900 hover:bg-brand-800 transition-all shadow-md shadow-brand-950/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center space-x-2 text-sm cursor-pointer"
           >
             {loading ? (
-              <span>Verifying & Logging In...</span>
+              <span>Verifying & Signing In...</span>
             ) : (
               <>
                 <UserCheck className="w-4 h-4 text-gold-400" />
-                <span>Sign In to Member Portal</span>
+                <span>Sign In with Member ID & Password</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -150,7 +159,7 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
             <button
               type="button"
               onClick={onNavigateToRegister}
-              className="font-bold text-brand-900 hover:underline"
+              className="font-bold text-brand-900 hover:underline cursor-pointer"
             >
               Join Kaveri Member Club
             </button>

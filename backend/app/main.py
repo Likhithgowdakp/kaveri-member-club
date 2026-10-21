@@ -25,6 +25,12 @@ async def lifespan(app: FastAPI):
     # Auto-create tables on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Ensure password_hash column exists on existing members table
+        try:
+            from sqlalchemy import text
+            await conn.execute(text("ALTER TABLE members ADD COLUMN password_hash VARCHAR(255)"))
+        except Exception:
+            pass
     yield
     await engine.dispose()
 

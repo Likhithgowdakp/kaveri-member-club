@@ -48,6 +48,53 @@ async def test_member_login_success_and_failure(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_member_registration_and_login_with_password(client: AsyncClient):
+    """Customer sets password at registration and can log in via Member ID + Password."""
+    # 1. Register with custom password
+    reg = await client.post("/api/v1/members/register", json={
+        "full_name": "Deepak Shivam",
+        "primary_phone": "9740112233",
+        "password": "KaveriCustomer@2026",
+        "consent_whatsapp": True,
+        "consent_sms": True,
+        "accept_privacy_notice": True,
+    })
+    assert reg.status_code == 201
+    member_num = reg.json()["member"]["member_number"]
+
+    # 2. Login with Member ID + correct password
+    login_id = await client.post("/api/v1/members/login", json={
+        "member_identifier": member_num,
+        "password": "KaveriCustomer@2026",
+    })
+    assert login_id.status_code == 200
+    assert login_id.json()["full_name"] == "Deepak Shivam"
+    assert login_id.json()["member_number"] == member_num
+
+    # 3. Login with Mobile Number + correct password
+    login_phone = await client.post("/api/v1/members/login", json={
+        "member_identifier": "9740112233",
+        "password": "KaveriCustomer@2026",
+    })
+    assert login_phone.status_code == 200
+    assert login_phone.json()["member_number"] == member_num
+
+    # 4. Login with wrong password -> Must fail with 401
+    wrong_pwd = await client.post("/api/v1/members/login", json={
+        "member_identifier": member_num,
+        "password": "WrongPassword!",
+    })
+    assert wrong_pwd.status_code == 401
+
+    # 5. Login with non-existent ID -> Must fail with 401
+    unknown_id = await client.post("/api/v1/members/login", json={
+        "member_identifier": "KAV-999999",
+        "password": "KaveriCustomer@2026",
+    })
+    assert unknown_id.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_admin_member_deletion_washout(
     client: AsyncClient, test_db: AsyncSession, auth_headers_owner: dict
 ):

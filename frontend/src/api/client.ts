@@ -54,6 +54,7 @@ export const api = {
     alt_phone?: string;
     email?: string;
     address?: string;
+    password?: string;
     consent_whatsapp: boolean;
     consent_sms: boolean;
     accept_privacy_notice: boolean;
@@ -61,6 +62,12 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+
+  memberLogin: (data: { member_identifier: string; password: string }) =>
+    request<any>('/members/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   getMemberCard: (memberNumber: string) =>
     request<any>(`/members/${encodeURIComponent(memberNumber)}/card`),

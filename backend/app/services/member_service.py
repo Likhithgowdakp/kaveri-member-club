@@ -10,6 +10,7 @@ from app.models.consent import MarketingConsent, ConsentAuditLog
 from app.models.loyalty import LoyaltyTransaction
 from app.models.campaign import CampaignSendJob
 from app.schemas.member import MemberRegisterRequest
+from app.security.hashing import hash_password
 
 
 # Async lock for concurrency safety across tasks and SQLite connections
@@ -62,6 +63,8 @@ async def register_member(
         
         # 3. Create Member record
         now = datetime.now(timezone.utc)
+        pwd_to_hash = request.password if request.password else request.primary_phone[-4:]
+        pwd_hash = hash_password(pwd_to_hash)
         new_member = Member(
             member_number=member_number,
             full_name=request.full_name,
@@ -69,6 +72,7 @@ async def register_member(
             alt_phone=request.alt_phone,
             email=str(request.email) if request.email else None,
             address=request.address,
+            password_hash=pwd_hash,
             status="active",
             loyalty_points=settings.REGISTRATION_BONUS_POINTS,
             created_at=now,

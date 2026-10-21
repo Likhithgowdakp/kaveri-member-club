@@ -19,6 +19,7 @@ class Member(Base):
     alt_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)  # active, suspended, closed
     loyalty_points: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.schemas.member import MemberVerifyRequest
+from app.schemas.member import MemberVerifyRequest, MemberLoginRequest
 from app.schemas.consent import (
     CustomerPreferencesResponse,
     ConsentItem,
@@ -17,8 +17,20 @@ from app.services.consent_service import (
 from app.services.messaging.sms import DLTSmsProvider
 from app.services.member_service import washout_member_data
 from app.security.rate_limiter import get_client_ip
+from app.api.v1.members import member_login_with_password
 
 router = APIRouter(prefix="/preferences", tags=["Customer Preferences (Self-Service)"])
+
+
+@router.post("/login", response_model=CustomerPreferencesResponse)
+async def member_login_alias(
+    login_data: MemberLoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Login endpoint via preferences route using Member ID + Password.
+    """
+    return await member_login_with_password(login_data, db)
 
 
 @router.post("/verify", response_model=CustomerPreferencesResponse)

@@ -256,10 +256,22 @@ export const PreferencesPage: React.FC<PreferencesPageProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl font-bold text-white bg-brand-900 hover:bg-brand-800 transition-all shadow-md disabled:opacity-50 flex items-center justify-center space-x-2 text-sm"
+              className="w-full py-3 px-4 rounded-xl font-bold text-white bg-brand-900 hover:bg-brand-800 transition-all shadow-md disabled:opacity-50 flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
               {loading ? <span>Verifying...</span> : <span>Verify & Access My Preferences</span>}
             </button>
+
+            {onNavigateToLogin && (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={onNavigateToLogin}
+                  className="text-xs text-brand-900 font-bold hover:underline cursor-pointer"
+                >
+                  Have a password? Sign in with Member ID & Password →
+                </button>
+              </div>
+            )}
           </form>
         </div>
       ) : (

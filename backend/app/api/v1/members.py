@@ -1,7 +1,8 @@
+import re
 from typing import Optional
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_, func
 from app.config import settings
 from app.database import get_db
 from app.models.member import Member
@@ -9,9 +10,13 @@ from app.schemas.member import (
     MemberRegisterRequest,
     MemberRegistrationResult,
     MemberResponse,
+    MemberLoginRequest,
 )
+from app.schemas.consent import CustomerPreferencesResponse, ConsentItem
+from app.services.consent_service import get_all_consents_for_member
 from app.services.member_service import register_member
 from app.services.messaging.sms import DLTSmsProvider
+from app.security.hashing import verify_password
 from app.security.rate_limiter import rate_limit, get_client_ip
 
 router = APIRouter(prefix="/members", tags=["Members (Public)"])
@@ -90,3 +95,88 @@ async def get_membership_card(
 
     # Return member data for card display
     return MemberResponse.model_validate(member)
+
+
+@router.post("/login", response_model=CustomerPreferencesResponse)
+async def member_login_with_password(
+    login_data: MemberLoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Customer portal login endpoint using Member ID (e.g. KAV-000001) or mobile number + password:
+    - Validates Member ID or Phone.
+    - Verifies password with Argon2id hash.
+    - Sends automated login confirmation SMS directly from the app under KAVERI CLUB HALAGURU.
+    - Returns full member profile and consent preferences.
+    """
+    identifier_clean = login_data.member_identifier.strip().upper()
+    
+    digits_only = re.sub(r"\D", "", login_data.member_identifier)
+    phone_clean = f"+91{digits_only[-10:]}" if len(digits_only) >= 10 else None
+
+    conditions = [func.upper(Member.member_number) == identifier_clean]
+    if phone_clean:
+        conditions.append(Member.primary_phone == phone_clean)
+    else:
+        conditions.append(Member.primary_phone == identifier_clean)
+
+    stmt = select(Member).where(or_(*conditions))
+    res = await db.execute(stmt)
+    member = res.scalar_one_or_none()
+
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Member ID or Password. Please check your credentials.",
+        )
+
+    if member.status == "closed":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This membership account is closed.",
+        )
+
+    if member.status == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This membership account is currently suspended. Please contact Kaveri Electronic store.",
+        )
+
+    # Verify password
+    if member.password_hash:
+        if not verify_password(login_data.password, member.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Member ID or Password. Please check your credentials.",
+            )
+    else:
+        # Fallback for members registered before password field
+        if login_data.password not in member.primary_phone:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Member ID or Password. Please check your credentials.",
+            )
+
+    # Dispatch access notification SMS to the member's registered phone
+    login_sms = (
+        f"Namaskara {member.full_name}! You have successfully logged into KAVERI CLUB HALAGURU. "
+        f"Member ID: {member.member_number}. Points Balance: {member.loyalty_points} pts. "
+        f"Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri."
+    )
+    sms_provider = DLTSmsProvider()
+    await sms_provider.send_message(
+        recipient_phone=member.primary_phone,
+        message_text=login_sms,
+    )
+
+    consents = await get_all_consents_for_member(db, member.id)
+
+    return CustomerPreferencesResponse(
+        member_number=member.member_number,
+        full_name=member.full_name,
+        primary_phone=member.primary_phone,
+        email=member.email,
+        address=member.address,
+        loyalty_points=member.loyalty_points,
+        consents=[ConsentItem.model_validate(c) for c in consents],
+    )

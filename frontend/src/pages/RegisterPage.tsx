@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { Modal } from '../components/Modal';
-import { ShieldCheck, MessageSquare, Smartphone, CheckCircle, AlertCircle, Info, Sparkles, MapPin } from 'lucide-react';
+import { ShieldCheck, MessageSquare, Smartphone, CheckCircle, AlertCircle, Info, Sparkles, MapPin, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface RegisterPageProps {
   onRegistrationSuccess: (memberData: any) => void;
@@ -13,6 +13,11 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
   const [altPhone, setAltPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
+
+  // Password for Member Portal Login
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   // Consent checkboxes UNCHECKED by default
   const [consentWhatsapp, setConsentWhatsapp] = useState(false);
@@ -32,6 +37,16 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
       return;
     }
 
+    if (!password || password.length < 4) {
+      setErrorMsg('Please enter an account password of at least 4 characters for logging into your member portal.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match. Please verify both password fields.');
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await api.registerMember({
@@ -40,6 +55,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
         alt_phone: altPhone.trim() || undefined,
         email: email.trim() || undefined,
         address: address.trim() || undefined,
+        password: password,
         consent_whatsapp: consentWhatsapp,
         consent_sms: consentSms,
         accept_privacy_notice: acceptPrivacy,
@@ -179,6 +195,63 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
               onChange={(e) => setAddress(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-2 focus:ring-brand-200 text-sm text-slate-900"
             />
+          </div>
+
+          {/* Account Password for Member Portal Login */}
+          <div className="bg-amber-50/60 rounded-2xl p-4 sm:p-5 border border-amber-200/80 space-y-3">
+            <div className="flex items-center space-x-2">
+              <Lock className="w-4 h-4 text-brand-900" />
+              <h3 className="text-sm font-bold text-brand-950">
+                Set Your Member Club Password <span className="text-rose-600">*</span>
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              You will use this password along with your Member ID to log in to your digital membership card, view loyalty points, and manage preferences.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              <div>
+                <label htmlFor="regPassword" className="block text-xs font-bold text-slate-800 mb-1.5">
+                  Create Password <span className="text-rose-600">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="regPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={4}
+                    placeholder="Min 4 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-2 focus:ring-brand-200 text-sm bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="regConfirmPassword" className="block text-xs font-bold text-slate-800 mb-1.5">
+                  Confirm Password <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  id="regConfirmPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={4}
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-2 focus:ring-brand-200 text-sm bg-white"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Voluntary Separate Marketing Consents (DPDP Act 2023 Compliant) */}
