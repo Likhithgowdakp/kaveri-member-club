@@ -76,7 +76,7 @@ import android.view.WindowManager;
 
 public class MainActivity extends Activity {
     private WebView webView;
-    private static final String APP_URL = "https://amenities-hollow-sufficient-jane.trycloudflare.com/";
+    private static final String APP_URL = "https://humans-knew-calendars-treasure.trycloudflare.com/";
 
     public static class AppWebViewClient extends WebViewClient {
         @Override
