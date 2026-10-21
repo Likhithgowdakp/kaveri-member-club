@@ -7,15 +7,21 @@ from app.services.messaging.base import BaseMessagingProvider, SendResult
 
 class DLTSmsProvider(BaseMessagingProvider):
     """
-    Indian Telecom Regulatory Authority (TRAI) DLT-Compliant SMS Gateway Provider.
-    Enforces Principal Entity ID, Sender Header (e.g. KAVERI), and DLT Template registration.
+    Indian Telecom Regulatory Authority (TRAI) DLT & Fast2SMS Gateway Provider.
+    Enforces Sender Header (e.g. KAVERI) and supports Quick SMS & DLT routes.
     """
 
-    def __init__(self):
-        self.enabled = settings.SMS_ENABLED
-        self.api_key = settings.SMS_API_KEY
-        self.sender_id = settings.SMS_SENDER_ID or "KAVERI"
-        self.entity_id = settings.SMS_ENTITY_ID
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        sender_id: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        enabled: Optional[bool] = None,
+    ):
+        self.api_key = (api_key or settings.SMS_API_KEY or "").strip()
+        self.enabled = (enabled if enabled is not None else settings.SMS_ENABLED) or bool(self.api_key)
+        self.sender_id = (sender_id or settings.SMS_SENDER_ID or "KAVERI").strip()
+        self.entity_id = (entity_id or settings.SMS_ENTITY_ID or "").strip()
         self.provider = settings.SMS_PROVIDER
 
     def is_configured(self) -> bool:
@@ -28,8 +34,8 @@ class DLTSmsProvider(BaseMessagingProvider):
         template_name: Optional[str] = None,
         template_params: Optional[Dict[str, Any]] = None,
     ) -> SendResult:
-        # Strip country code for Indian local 10-digit number
-        clean_phone = recipient_phone.replace("+91", "").replace("+", "").strip()
+        # Extract the last 10 digits cleanly (handles +91, spaces, dashes)
+        clean_phone = "".join(filter(str.isdigit, recipient_phone))[-10:]
 
         # Ensure Sender Name is explicitly included in the SMS body for customer clarity
         formatted_message = message_text
@@ -50,7 +56,7 @@ class DLTSmsProvider(BaseMessagingProvider):
                     "sender_header": self.sender_id,
                     "recipient": f"+91{clean_phone}",
                     "channel": "SMS (Kaveri App Service)",
-                    "note": "SMS successfully dispatched from Kaveri App backend (not personal number).",
+                    "note": "SMS simulated in dry-run mode. Add a Fast2SMS or DLT API key in Admin Settings to transmit real cellular SMS to physical phones.",
                 },
             )
 
@@ -97,11 +103,12 @@ class DLTSmsProvider(BaseMessagingProvider):
                         details=data,
                     )
                 else:
-                    err_msg = data.get("message", [response.text])
+                    raw_msg = data.get("message", [response.text])
+                    err_msg = raw_msg[0] if isinstance(raw_msg, list) and len(raw_msg) > 0 else str(raw_msg)
                     return SendResult(
                         success=False,
                         status="failed",
-                        error_message=f"DLT SMS Provider error: {err_msg}",
+                        error_message=f"SMS Gateway error: {err_msg}",
                         is_dry_run=False,
                         details=data,
                     )

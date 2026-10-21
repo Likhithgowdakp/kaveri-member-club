@@ -17,6 +17,8 @@ class StoreSettingsUpdate(BaseModel):
     whatsapp_group_url: Optional[str] = None
     business_phone: Optional[str] = None
     welcome_message_template: Optional[str] = None
+    sms_api_key: Optional[str] = None
+    sms_sender_id: Optional[str] = None
 
 
 @router.get("/public")
@@ -41,10 +43,16 @@ async def get_admin_settings(
     current_user: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin endpoint to view current store preferences."""
+    """Admin endpoint to view current store preferences and SMS gateway config."""
     stmt = select(StoreSetting)
     res = await db.execute(stmt)
     saved_settings = {s.key: s.value for s in res.scalars().all()}
+
+    saved_sms_key = saved_settings.get("sms_api_key", settings.SMS_API_KEY)
+    masked_sms_key = ""
+    if saved_sms_key and saved_sms_key.strip():
+        k = saved_sms_key.strip()
+        masked_sms_key = f"{k[:4]}...{k[-4:]}" if len(k) > 8 else "***Configured***"
 
     return {
         "whatsapp_group_url": saved_settings.get(
@@ -55,6 +63,9 @@ async def get_admin_settings(
             "welcome_message_template",
             "Namaskara {{name}}! Welcome to Kaveri Member Club. Your Member ID is {{member_id}} with 50 loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru!",
         ),
+        "sms_api_key_configured": bool(saved_sms_key and saved_sms_key.strip()),
+        "sms_api_key_masked": masked_sms_key,
+        "sms_sender_id": saved_settings.get("sms_sender_id", settings.SMS_SENDER_ID or "KAVERI"),
     }
 
 
@@ -64,7 +75,7 @@ async def update_admin_settings(
     current_user: AdminUser = Depends(require_role(["owner", "manager"])),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin endpoint to update WhatsApp group link and store preferences."""
+    """Admin endpoint to update WhatsApp group link, SMS gateway credentials, and store preferences."""
     now = datetime.now(timezone.utc)
 
     if update_data.whatsapp_group_url is not None:
@@ -114,10 +125,48 @@ async def update_admin_settings(
                 StoreSetting(
                     key="welcome_message_template",
                     value=update_data.welcome_message_template.strip(),
-                    description="Template for direct WhatsApp click-to-chat messaging",
+                    description="Template for official welcome messaging",
                     updated_at=now,
                 )
             )
 
+    if update_data.sms_api_key is not None:
+        key_val = update_data.sms_api_key.strip()
+        if key_val and not key_val.startswith("***"):
+            stmt = select(StoreSetting).where(StoreSetting.key == "sms_api_key")
+            res = await db.execute(stmt)
+            setting = res.scalar_one_or_none()
+            if setting:
+                setting.value = key_val
+                setting.updated_at = now
+            else:
+                db.add(
+                    StoreSetting(
+                        key="sms_api_key",
+                        value=key_val,
+                        description="SMS Gateway API Key (Fast2SMS / DLT)",
+                        updated_at=now,
+                    )
+                )
+
+    if update_data.sms_sender_id is not None:
+        sender_val = update_data.sms_sender_id.strip()
+        if sender_val:
+            stmt = select(StoreSetting).where(StoreSetting.key == "sms_sender_id")
+            res = await db.execute(stmt)
+            setting = res.scalar_one_or_none()
+            if setting:
+                setting.value = sender_val
+                setting.updated_at = now
+            else:
+                db.add(
+                    StoreSetting(
+                        key="sms_sender_id",
+                        value=sender_val,
+                        description="SMS Sender Header / ID",
+                        updated_at=now,
+                    )
+                )
+
     await db.commit()
-    return {"message": "Store and WhatsApp settings saved successfully."}
+    return {"message": "Store, WhatsApp, and SMS settings saved successfully."}

@@ -30,23 +30,51 @@ input:user-valid:not(:placeholder-shown) {
 }
 
 /* Print styling for Membership Card */
+@page {
+  size: A4 portrait;
+  margin: 18mm 20mm 20mm 20mm;
+}
+
 @media print {
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
-  #membership-card-print, #membership-card-print * {
-    visibility: visible;
+
+  #membership-card-print,
+  #membership-card-print * {
+    visibility: visible !important;
   }
+
   #membership-card-print {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    box-shadow: none !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 580px !important;
+    margin: 24px auto !important;
+    padding: 36px 40px !important;
+    border-radius: 24px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
   }
+
   .no-print {
     display: none !important;
   }
 }
+

@@ -8,6 +8,7 @@ from app.models.member import Member
 from app.models.consent import MarketingConsent, ConsentAuditLog
 from app.models.loyalty import LoyaltyTransaction
 from app.models.admin import AdminUser
+from app.models.setting import StoreSetting
 from app.schemas.member import MemberResponse, MemberUpdateRequest
 from app.security.auth import get_current_admin, require_role
 from pydantic import BaseModel
@@ -243,7 +244,7 @@ async def send_app_sms_to_member(
 ):
     """
     Sends an official SMS to the customer directly from the app backend,
-    under the business sender name 'KAVERI CLUB HALAGURU' (DLT Header: KAVERI).
+    under the business sender name 'KAVERI CLUB HALAGURU'.
     Never uses or exposes the owner's personal phone number!
     """
     stmt = select(Member).where(Member.id == member_id)
@@ -252,46 +253,48 @@ async def send_app_sms_to_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found.")
 
-    clean_phone = member.primary_phone.replace("+91", "").replace("+", "").strip()
-    encoded_text = urllib.parse.quote(data.message)
-    whatsapp_url = f"https://api.whatsapp.com/send?phone=91{clean_phone}&text={encoded_text}"
-    sms_url = f"sms:+91{clean_phone}?body={encoded_text}"
+    clean_phone = "".join(filter(str.isdigit, member.primary_phone))[-10:]
 
-    sms_provider = DLTSmsProvider()
+    # Check store_settings table for dynamic SMS configuration
+    stmt_key = select(StoreSetting).where(StoreSetting.key == "sms_api_key")
+    res_key = await db.execute(stmt_key)
+    row_key = res_key.scalar_one_or_none()
+    active_sms_key = row_key.value if row_key and row_key.value else None
+
+    stmt_sender = select(StoreSetting).where(StoreSetting.key == "sms_sender_id")
+    res_sender = await db.execute(stmt_sender)
+    row_sender = res_sender.scalar_one_or_none()
+    active_sender = row_sender.value if row_sender and row_sender.value else None
+
+    sms_provider = DLTSmsProvider(api_key=active_sms_key, sender_id=active_sender)
     result = await sms_provider.send_message(
-        recipient_phone=member.primary_phone,
+        recipient_phone=clean_phone,
         message_text=data.message,
     )
-
-    # Also dispatch via WhatsApp Cloud API if configured
-    if whatsapp_provider.is_configured():
-        try:
-            await whatsapp_provider.send_message(
-                recipient_phone=member.primary_phone,
-                message_text=data.message,
-            )
-        except Exception:
-            pass
 
     await log_admin_action(
         db,
         current_user,
-        "SEND_APP_SMS_AND_WHATSAPP",
+        "SEND_APP_SMS",
         "member",
         str(member.id),
-        f"Sent 1-Click SMS & WhatsApp to {member.primary_phone} under KAVERI CLUB HALAGURU: {data.message[:60]}...",
+        f"Sent App SMS to +91{clean_phone} under KAVERI CLUB HALAGURU (Status: {result.status}, DryRun: {result.is_dry_run}): {data.message[:60]}...",
         get_client_ip(request),
     )
 
     return {
-        "success": True,
-        "sender": "KAVERI CLUB HALAGURU",
-        "recipient": member.primary_phone,
-        "clean_phone": clean_phone,
-        "whatsapp_url": whatsapp_url,
-        "sms_url": sms_url,
+        "success": result.success,
+        "status": result.status,
+        "is_dry_run": result.is_dry_run,
         "provider_message_id": result.provider_message_id,
-        "message": f"Dispatched SMS & WhatsApp to {member.primary_phone} under 'KAVERI CLUB HALAGURU'.",
+        "sender": "KAVERI CLUB HALAGURU",
+        "recipient": f"+91{clean_phone}",
+        "clean_phone": clean_phone,
+        "error_message": result.error_message,
+        "details": result.details,
+        "message": f"Dispatched SMS to +91{clean_phone} under 'KAVERI CLUB HALAGURU'."
+        if result.success
+        else f"SMS dispatch failed: {result.error_message}",
     }
 
 

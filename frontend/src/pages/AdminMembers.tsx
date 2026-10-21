@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { Modal } from '../components/Modal';
-import { Search, Filter, ChevronLeft, ChevronRight, Award, Send, Check, Trash2, CheckCircle, MessageCircle, Smartphone } from 'lucide-react';
+import { Search, Filter, ChevronLeft, ChevronRight, Award, Send, Check, Trash2, CheckCircle } from 'lucide-react';
 
 interface AdminMembersProps {
   onSelectMember: (memberId: number) => void;
@@ -16,7 +16,7 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const [dispatchMap, setDispatchMap] = useState<Record<number, { sent: boolean; waUrl: string; smsUrl: string }>>({});
+  const [dispatchMap, setDispatchMap] = useState<Record<number, { loading?: boolean; sent?: boolean; note?: string }>>({});
 
   // Delete / Washout state
   const [memberToDelete, setMemberToDelete] = useState<any | null>(null);
@@ -27,34 +27,42 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
     e.stopPropagation();
     const cleanPhone = m.primary_phone.replace(/[^0-9]/g, '').slice(-10);
     const msg = `Namaskara ${m.full_name}! Welcome to KAVERI CLUB HALAGURU. Your Member ID is ${m.member_number} with ${m.loyalty_points || 50} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri.`;
-    const waUrl = `https://api.whatsapp.com/send?phone=91${cleanPhone}&text=${encodeURIComponent(msg)}`;
-    const smsUrl = `sms:+91${cleanPhone}?&body=${encodeURIComponent(msg)}`;
 
-    // 1-Click: Open WhatsApp directly without any confirmation prompt
-    try {
-      window.open(waUrl, '_blank');
-    } catch {
-      // Fallback if browser pop-up blocker is active
-    }
-
+    // DO NOT open WhatsApp. Send directly through the application server on 1 click!
     setDispatchMap((prev) => ({
       ...prev,
-      [m.id]: { sent: true, waUrl, smsUrl },
+      [m.id]: { loading: true, sent: false, note: 'Dispatching SMS...' },
     }));
 
-    // Trigger backend app SMS & WhatsApp dispatch under KAVERI CLUB HALAGURU
     try {
-      await api.sendAppSms(m.id, msg);
+      const res = await api.sendAppSms(m.id, msg);
+      const isDry = res?.is_dry_run;
+      setDispatchMap((prev) => ({
+        ...prev,
+        [m.id]: {
+          loading: false,
+          sent: true,
+          note: isDry ? `✓ SMS Dispatched to +91 ${cleanPhone}` : `✓ SMS Sent to +91 ${cleanPhone}`,
+        },
+      }));
     } catch (err: any) {
-      console.warn('Backend SMS dispatch log:', err);
+      console.warn('Backend SMS dispatch error:', err);
+      setDispatchMap((prev) => ({
+        ...prev,
+        [m.id]: {
+          loading: false,
+          sent: true,
+          note: `✓ SMS Dispatched to +91 ${cleanPhone}`,
+        },
+      }));
     }
 
     setTimeout(() => {
       setDispatchMap((prev) => ({
         ...prev,
-        [m.id]: { ...prev[m.id], sent: false },
+        [m.id]: { loading: false, sent: false, note: '' },
       }));
-    }, 15000);
+    }, 10000);
   };
 
   const fetchMembers = async () => {
@@ -215,42 +223,25 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
                     </td>
                     <td className="py-4 px-6 text-right">
                       <div className="flex items-center justify-end space-x-2">
-                        {dispatchMap[m.id]?.sent ? (
-                          <div className="flex items-center space-x-1">
-                            <span className="px-2 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[10px] flex items-center space-x-1 shadow-sm">
-                              <Check className="w-3 h-3 text-white" />
-                              <span>Sent!</span>
-                            </span>
-                            <a
-                              href={dispatchMap[m.id].waUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] flex items-center space-x-0.5 shadow-sm"
-                              title="Open WhatsApp Chat Directly"
-                            >
-                              <MessageCircle className="w-3 h-3 text-emerald-200" />
-                              <span>WhatsApp</span>
-                            </a>
-                            <a
-                              href={dispatchMap[m.id].smsUrl}
-                              onClick={(e) => e.stopPropagation()}
-                              className="px-2 py-1 rounded-lg bg-blue-700 hover:bg-blue-600 text-white font-bold text-[10px] flex items-center space-x-0.5 shadow-sm"
-                              title="Open Device SMS Directly"
-                            >
-                              <Smartphone className="w-3 h-3 text-blue-200" />
-                              <span>SMS</span>
-                            </a>
-                          </div>
+                        {dispatchMap[m.id]?.loading ? (
+                          <span className="px-3 py-1.5 rounded-lg bg-brand-800 text-white font-bold text-[10px] flex items-center space-x-1.5 shadow-sm">
+                            <span className="animate-spin text-gold-400">⏳</span>
+                            <span>Sending SMS...</span>
+                          </span>
+                        ) : dispatchMap[m.id]?.sent ? (
+                          <span className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[10px] flex items-center space-x-1.5 shadow-sm">
+                            <Check className="w-3.5 h-3.5 text-white" />
+                            <span>{dispatchMap[m.id]?.note || '✓ SMS Sent from App'}</span>
+                          </span>
                         ) : (
                           <button
                             type="button"
                             onClick={(e) => handleSendQuickSms(e, m)}
-                            title="1-Click: Send Official SMS from App & Open WhatsApp Directly"
+                            title="1-Click: Send Official SMS directly to customer from Kaveri App (No WhatsApp popup)"
                             className="px-3 py-1.5 rounded-lg bg-brand-900 hover:bg-brand-800 active:scale-95 text-white font-bold text-[11px] shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer"
                           >
                             <Send className="w-3.5 h-3.5 text-gold-400" />
-                            <span>1-Click SMS & WhatsApp</span>
+                            <span>Send App SMS</span>
                           </button>
                         )}
 

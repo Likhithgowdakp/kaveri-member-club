@@ -228,7 +228,13 @@ export const api = {
   // Store & WhatsApp Group Settings
   getPublicSettings: () => request<any>('/settings/public'),
   getAdminSettings: () => request<any>('/settings/admin'),
-  updateAdminSettings: (data: { whatsapp_group_url?: string; business_phone?: string; welcome_message_template?: string }) =>
+  updateAdminSettings: (data: {
+    whatsapp_group_url?: string;
+    business_phone?: string;
+    welcome_message_template?: string;
+    sms_api_key?: string;
+    sms_sender_id?: string;
+  }) =>
     request<any>('/settings/admin', {
       method: 'POST',
       body: JSON.stringify(data),

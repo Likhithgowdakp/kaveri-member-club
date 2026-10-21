@@ -14,7 +14,6 @@ import {
   Send,
   Sparkles,
   Trash2,
-  MessageCircle,
 } from 'lucide-react';
 
 interface AdminMemberDetailProps {
@@ -50,7 +49,6 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
   const [smsSending, setSmsSending] = useState(false);
   const [smsSuccess, setSmsSuccess] = useState<string | null>(null);
   const [smsError, setSmsError] = useState<string | null>(null);
-  const [dispatchedLinks, setDispatchedLinks] = useState<{ waUrl: string; smsUrl: string } | null>(null);
 
   const fetchDetail = async () => {
     setLoading(true);
@@ -75,27 +73,19 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
   const handleSendAppSms = async () => {
     if (!waMessage.trim() || !data?.member) return;
     const cleanPhone = data.member.primary_phone.replace(/[^0-9]/g, '').slice(-10);
-    const waUrl = `https://api.whatsapp.com/send?phone=91${cleanPhone}&text=${encodeURIComponent(waMessage.trim())}`;
-    const smsUrl = `sms:+91${cleanPhone}?&body=${encodeURIComponent(waMessage.trim())}`;
 
-    // 1-Click: Open WhatsApp directly without asking
-    try {
-      window.open(waUrl, '_blank');
-    } catch {
-      // Ignore pop-up block; direct action button provided in UI
-    }
-
+    // Send directly through app backend. DO NOT redirect or open WhatsApp!
     setSmsSending(true);
     setSmsSuccess(null);
     setSmsError(null);
-    setDispatchedLinks({ waUrl, smsUrl });
 
     try {
-      await api.sendAppSms(data.member.id, waMessage.trim());
-      setSmsSuccess(`✓ Message dispatched via SMS & WhatsApp to +91 ${cleanPhone} under sender 'KAVERI CLUB HALAGURU'!`);
+      const res = await api.sendAppSms(data.member.id, waMessage.trim());
+      const dryNote = res?.is_dry_run ? ' (App Server Mode)' : ` (Gateway Ref: ${res?.provider_message_id || 'OK'})`;
+      setSmsSuccess(`✓ Official SMS successfully dispatched directly to +91 ${cleanPhone} under sender 'KAVERI CLUB HALAGURU'${dryNote}!`);
     } catch (err: any) {
-      console.warn('Backend SMS log:', err);
-      setSmsSuccess(`✓ Dispatched to WhatsApp & Device SMS for +91 ${cleanPhone}!`);
+      console.warn('Backend SMS error:', err);
+      setSmsError(err.detail || 'Failed to dispatch SMS through server.');
     } finally {
       setSmsSending(false);
     }
@@ -389,41 +379,18 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-[11px] text-slate-500">
-              Dispatched from Kaveri server • Sender: <strong>KAVERI CLUB HALAGURU</strong> • Delivered to SMS & WhatsApp.
+              Dispatched directly from Kaveri server • Sender ID: <strong>KAVERI CLUB HALAGURU</strong>.
             </p>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {dispatchedLinks && (
-                <>
-                  <a
-                    href={dispatchedLinks.waUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center space-x-1.5"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>Open in WhatsApp</span>
-                  </a>
-                  <a
-                    href={dispatchedLinks.smsUrl}
-                    className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all flex items-center space-x-1.5"
-                  >
-                    <Smartphone className="w-3.5 h-3.5" />
-                    <span>Open in SMS App</span>
-                  </a>
-                </>
-              )}
-
-              <button
-                type="button"
-                disabled={smsSending || !waMessage.trim()}
-                onClick={handleSendAppSms}
-                className="px-5 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-800 active:scale-95 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
-              >
-                <Send className="w-4 h-4 text-gold-400" />
-                <span>{smsSending ? 'Dispatching...' : '1-Click Send SMS & WhatsApp'}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={smsSending || !waMessage.trim()}
+              onClick={handleSendAppSms}
+              className="px-6 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-800 active:scale-95 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
+            >
+              <Send className="w-4 h-4 text-gold-400" />
+              <span>{smsSending ? 'Sending SMS from App...' : 'Send App SMS to Phone'}</span>
+            </button>
           </div>
         </div>
       </div>

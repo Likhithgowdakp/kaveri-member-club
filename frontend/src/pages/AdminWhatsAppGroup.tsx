@@ -11,7 +11,6 @@ import {
   Store,
   Sparkles,
   Users,
-  ShieldCheck,
   Smartphone,
   Save,
 } from 'lucide-react';
@@ -23,6 +22,16 @@ export const AdminWhatsAppGroup: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // SMS Gateway state
+  const [smsApiKey, setSmsApiKey] = useState('');
+  const [smsSenderId, setSmsSenderId] = useState('KAVERI');
+  const [smsConfigured, setSmsConfigured] = useState(false);
+  const [smsSavedSuccess, setSmsSavedSuccess] = useState(false);
+  const [smsLoading, setSmsLoading] = useState(false);
+  const [smsError, setSmsError] = useState<string | null>(null);
+  const [showKey, setShowKey] = useState(false);
+
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,10 +48,39 @@ export const AdminWhatsAppGroup: React.FC = () => {
       } else {
         generateQr(groupUrl);
       }
+
+      if (data.sms_api_key_configured) {
+        setSmsConfigured(true);
+        setSmsApiKey(data.sms_api_key_masked || '***Configured***');
+      }
+      if (data.sms_sender_id) {
+        setSmsSenderId(data.sms_sender_id);
+      }
     } catch {
       generateQr(groupUrl);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveSms = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSmsLoading(true);
+    setSmsError(null);
+    setSmsSavedSuccess(false);
+
+    try {
+      await api.updateAdminSettings({
+        sms_api_key: smsApiKey.trim(),
+        sms_sender_id: smsSenderId.trim() || 'KAVERI',
+      });
+      setSmsSavedSuccess(true);
+      setSmsConfigured(true);
+      setTimeout(() => setSmsSavedSuccess(false), 4000);
+    } catch (err: any) {
+      setSmsError(err.detail || 'Failed to update SMS gateway settings');
+    } finally {
+      setSmsLoading(false);
     }
   };
 
@@ -253,18 +291,92 @@ export const AdminWhatsAppGroup: React.FC = () => {
             </form>
           </div>
 
-          {/* Direct Messaging Explanation Card */}
+          {/* SMS Gateway Configuration Card */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
-            <div className="flex items-center space-x-2 text-brand-950 font-bold text-sm mb-3">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <span>1-Click Direct WhatsApp Messaging Available</span>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-brand-950 flex items-center space-x-2">
+                <Smartphone className="w-5 h-5 text-brand-700" />
+                <span>Cellular SMS Gateway (Fast2SMS / DLT)</span>
+              </h2>
+              <span
+                className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full ${
+                  smsConfigured
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }`}
+              >
+                {smsConfigured ? '● Live Gateway Active' : '○ Dry-Run Simulation Mode'}
+              </span>
             </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Meta Cloud API charges per message and requires complex business verification.
-              To guarantee <strong>100% free, 100% reliable messaging with zero errors</strong>,
-              use the green <span className="font-bold text-emerald-700">"Send on WhatsApp"</span> button inside every customer's profile.
-              It automatically loads their mobile number and pre-crafts their membership ID and festive offers in WhatsApp!
-            </p>
+
+            {smsSavedSuccess && (
+              <div className="mb-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center space-x-2">
+                <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>SMS Gateway credentials saved! Real cellular SMS will now be transmitted directly to phones.</span>
+              </div>
+            )}
+
+            {smsError && (
+              <div className="mb-4 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+                {smsError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSms} className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Fast2SMS / DLT API Authorization Key
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="text-[11px] text-brand-800 hover:underline font-semibold"
+                  >
+                    {showKey ? 'Hide Key' : 'Show Key'}
+                  </button>
+                </div>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  placeholder="Paste Fast2SMS API Key (e.g. kHnL...)"
+                  value={smsApiKey}
+                  onChange={(e) => setSmsApiKey(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 text-xs font-mono"
+                />
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                  Fast2SMS Quick Route allows sending cellular SMS to any Indian number instantly without TRAI registration. Create a free account at{' '}
+                  <a href="https://www.fast2sms.com" target="_blank" rel="noreferrer" className="text-brand-900 font-bold underline">
+                    fast2sms.com
+                  </a>{' '}
+                  to get your API key.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  SMS Sender Header / ID
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="KAVERI"
+                  value={smsSenderId}
+                  onChange={(e) => setSmsSenderId(e.target.value.toUpperCase())}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 text-xs font-mono uppercase"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={smsLoading}
+                  className="px-5 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs shadow-md transition-all flex items-center space-x-2 cursor-pointer"
+                >
+                  <Save className="w-4 h-4 text-gold-400" />
+                  <span>{smsLoading ? 'Saving Key...' : 'Save SMS Gateway Settings'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 

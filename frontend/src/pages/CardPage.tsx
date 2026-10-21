@@ -176,20 +176,20 @@ export const CardPage: React.FC<CardPageProps> = ({
     }
   }, [member, security.token, security.securityHash]);
 
-  // 2. Generate Code 128 Barcode for POS scanner readability
+  // 2. Generate Code 128 Barcode for POS scanner readability (Black bars on white background)
   useEffect(() => {
     if (barcodeRef.current && member?.member_number) {
       try {
         JsBarcode(barcodeRef.current, member.member_number, {
           format: 'CODE128',
-          lineColor: '#ffffff',
-          width: 1.5,
-          height: 38,
+          lineColor: '#0f172a',
+          width: 1.6,
+          height: 40,
           displayValue: true,
           font: 'monospace',
-          fontSize: 11,
-          textMargin: 3,
-          background: 'transparent',
+          fontSize: 12,
+          textMargin: 4,
+          background: '#ffffff',
         });
       } catch (err) {
         console.error('Barcode generation failed', err);
@@ -297,10 +297,11 @@ export const CardPage: React.FC<CardPageProps> = ({
           </div>
 
           {/* Printable Anti-Counterfeit Digital Membership Card */}
+          {/* Printable Anti-Counterfeit Digital Membership Card */}
           <div
             id="membership-card-print"
             ref={cardRef}
-            className={`relative bg-gradient-to-br ${currentTheme.gradient} text-white rounded-3xl p-6 sm:p-8 shadow-2xl border-2 ${currentTheme.border} overflow-hidden`}
+            className={`relative bg-gradient-to-br ${currentTheme.gradient} text-white rounded-3xl p-6 sm:p-8 print:p-8 shadow-2xl border-2 ${currentTheme.border} overflow-hidden`}
           >
             {/* Mathematical Guilloche Anti-Counterfeit Security Watermark */}
             <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden">
@@ -333,12 +334,12 @@ export const CardPage: React.FC<CardPageProps> = ({
             </div>
 
             {/* Micro-print Security Ribbon along top edge */}
-            <div className="text-[7px] font-mono tracking-widest text-slate-400/50 uppercase truncate mb-2 select-none border-b border-white/10 pb-1">
+            <div className="text-[8px] font-mono tracking-wider text-slate-300 uppercase mb-3 select-none border-b border-white/15 pb-1.5 print:whitespace-normal print:break-all">
               AUTHENTIC MEMBER • KAVERI ELECTRONIC HALAGURU • HMS COMPLEX KANAKAPURA MAIN RD • TOKEN: {security.token} • CRC-{security.securityHash} • NON-TRANSFERABLE
             </div>
 
             {/* Card Header */}
-            <div className="flex items-start justify-between relative z-10 border-b border-white/15 pb-4">
+            <div className="flex items-start justify-between relative z-10 border-b border-white/15 pb-4 print:pb-4">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-brand-950 shadow-md">
                   <Store className="w-6 h-6" />
@@ -367,11 +368,11 @@ export const CardPage: React.FC<CardPageProps> = ({
             </div>
 
             {/* Card Body: Member Details + Small Full-Details QR Code */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 my-5 relative z-10 items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-6 print:gap-4 my-5 print:my-4 relative z-10 items-center">
               {/* Member Data */}
-              <div className="sm:col-span-2 space-y-3.5">
+              <div className="sm:col-span-2 print:col-span-2 space-y-3.5">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                  <p className="text-[11px] uppercase tracking-wider text-slate-300 font-medium">
                     Cardholder Name
                   </p>
                   <p className="text-2xl font-black text-white tracking-tight">
@@ -381,7 +382,7 @@ export const CardPage: React.FC<CardPageProps> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                    <p className="text-[11px] uppercase tracking-wider text-slate-300 font-medium">
                       Membership ID
                     </p>
                     <p className={`text-lg font-mono font-black ${currentTheme.accentText}`}>
@@ -389,7 +390,7 @@ export const CardPage: React.FC<CardPageProps> = ({
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                    <p className="text-[11px] uppercase tracking-wider text-slate-300 font-medium">
                       Loyalty Points
                     </p>
                     <p className="text-lg font-bold text-white flex items-center space-x-1">
@@ -401,15 +402,15 @@ export const CardPage: React.FC<CardPageProps> = ({
 
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-300 font-medium">
                       Primary Contact
                     </p>
-                    <p className="text-xs font-mono text-slate-200">
+                    <p className="text-xs font-mono text-slate-100 font-bold">
                       {member.primary_phone || 'Verified in Store'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-300 font-medium">
                       Card Issued
                     </p>
                     <p className="text-xs text-slate-200">
@@ -423,15 +424,15 @@ export const CardPage: React.FC<CardPageProps> = ({
                 </div>
 
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-300 font-medium">
                     Store Location & Support
                   </p>
-                  <p className="text-[11px] text-slate-300 flex items-center space-x-1 mt-0.5">
+                  <p className="text-[11px] text-slate-200 flex items-center space-x-1 mt-0.5">
                     <MapPin className="w-3.5 h-3.5 text-gold-400 flex-shrink-0" />
                     <span>HMS Complex, Kanakapura Main Road, Halaguru</span>
                   </p>
-                  <p className="text-[10px] text-slate-400 flex items-center space-x-2 mt-0.5">
-                    <span>Help: +91 72041 62882</span>
+                  <p className="text-[10px] text-slate-300 flex items-center space-x-2 mt-0.5">
+                    <span>Help: <strong>+91 72041 62882</strong></span>
                     <span>•</span>
                     <span>mathrushreemep@gmail.com</span>
                   </p>
@@ -439,12 +440,12 @@ export const CardPage: React.FC<CardPageProps> = ({
               </div>
 
               {/* Small QR Code containing ALL user details */}
-              <div className="flex flex-col items-center justify-center p-2.5 bg-white rounded-2xl shadow-xl text-center self-center sm:justify-self-end">
+              <div className="flex flex-col items-center justify-center p-2.5 bg-white rounded-2xl shadow-xl text-center self-center sm:justify-self-end print:justify-self-end">
                 {qrCodeUrl ? (
                   <img
                     src={qrCodeUrl}
                     alt="Scan for Full Customer Details"
-                    className="w-24 h-24 sm:w-28 sm:h-28 object-contain"
+                    className="w-24 h-24 sm:w-28 sm:h-28 print:w-24 print:h-24 object-contain"
                   />
                 ) : (
                   <div className="w-24 h-24 sm:w-28 sm:h-28 bg-slate-100 animate-pulse rounded-lg" />
@@ -458,16 +459,16 @@ export const CardPage: React.FC<CardPageProps> = ({
               </div>
             </div>
 
-            {/* High-Resolution Code 128 Barcode for POS / Billing Desk Scanners */}
-            <div className="relative z-10 bg-slate-950/60 rounded-xl p-2.5 border border-white/10 flex flex-col items-center justify-center my-3">
-              <svg ref={barcodeRef} className="max-w-full h-11" />
-              <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest mt-0.5">
+            {/* High-Resolution Code 128 Barcode for POS / Billing Desk Scanners (White container with dark bars for 100% optical scanner read) */}
+            <div className="relative z-10 bg-white rounded-2xl p-3 border border-slate-200 flex flex-col items-center justify-center my-3 shadow-sm">
+              <svg ref={barcodeRef} className="max-w-full h-11 print:h-11" />
+              <p className="text-[9px] font-mono font-bold text-slate-800 uppercase tracking-widest mt-0.5">
                 Official Optical POS Barcode • Scan at Store Checkout
               </p>
             </div>
 
             {/* Card Footer: Security Stamp & Microprint */}
-            <div className="border-t border-white/15 pt-2 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-400 relative z-10 gap-1">
+            <div className="border-t border-white/15 pt-2 flex flex-col sm:flex-row print:flex-row items-center justify-between text-[10px] text-slate-300 relative z-10 gap-1">
               <span className="flex items-center space-x-1 text-emerald-400 font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>Genuine Kaveri Card • Anti-Fraud Cryptographic Fingerprint</span>
