@@ -155,14 +155,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
 
                 {onOpenDownloadApp && (
-                  <button
-                    onClick={onOpenDownloadApp}
+                  <a
+                    href="/KaveriClub.apk"
+                    download="KaveriClub.apk"
+                    onClick={() => {
+                      if (onOpenDownloadApp) {
+                        onOpenDownloadApp();
+                      }
+                    }}
                     className="ml-2 px-3 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-400 hover:to-amber-400 text-brand-950 shadow-md hover:shadow-lg transition-all flex items-center space-x-1.5 cursor-pointer border border-gold-300 group"
-                    title="Install Kaveri Club Official Mobile App"
+                    title="Download Kaveri Club App (KaveriClub.apk)"
                   >
                     <Smartphone className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                     <span>Download App</span>
-                  </button>
+                  </a>
                 )}
               </>
             ) : (
@@ -236,14 +242,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile actions & menu button */}
           <div className="md:hidden flex items-center space-x-2">
             {onOpenDownloadApp && (
-              <button
-                onClick={onOpenDownloadApp}
+              <a
+                href="/KaveriClub.apk"
+                download="KaveriClub.apk"
+                onClick={() => {
+                  if (onOpenDownloadApp) {
+                    onOpenDownloadApp();
+                  }
+                }}
                 className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-gold-500 to-amber-500 text-brand-950 font-black text-xs shadow flex items-center space-x-1 border border-gold-300 active:scale-95 cursor-pointer"
-                title="Download Kaveri Club App"
+                title="Download Kaveri Club App (KaveriClub.apk)"
               >
                 <Smartphone className="w-3.5 h-3.5" />
                 <span>App</span>
-              </button>
+              </a>
             )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -262,21 +274,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           {!isAdminLoggedIn ? (
             <>
               {onOpenDownloadApp && (
-                <button
+                <a
+                  href="/KaveriClub.apk"
+                  download="KaveriClub.apk"
                   onClick={() => {
-                    onOpenDownloadApp();
+                    if (onOpenDownloadApp) onOpenDownloadApp();
                     setMobileMenuOpen(false);
                   }}
                   className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-gold-500 to-amber-500 text-brand-950 flex items-center justify-between shadow-md mb-2 cursor-pointer"
                 >
                   <div className="flex items-center space-x-2">
                     <Smartphone className="w-4 h-4" />
-                    <span>Install Official App / ಆ್ಯಪ್ ಡೌನ್‌ಲೋಡ್</span>
+                    <span>Download Official App (KaveriClub.apk)</span>
                   </div>
                   <span className="text-[10px] uppercase font-black bg-brand-950/20 px-2 py-0.5 rounded">
-                    Free PWA
+                    APK Download
                   </span>
-                </button>
+                </a>
               )}
               {loggedInMember ? (
                 <div className="p-3 mb-2 rounded-xl bg-brand-900 border border-brand-700 text-gold-300 text-xs font-bold flex items-center justify-between">

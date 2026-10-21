@@ -13,8 +13,7 @@ import { AdminCampaigns } from './pages/AdminCampaigns';
 import { AdminAuditLogs } from './pages/AdminAuditLogs';
 import { AdminWhatsAppGroup } from './pages/AdminWhatsAppGroup';
 import { api } from './api/client';
-import { Modal } from './components/Modal';
-import { ShieldCheck, ShieldAlert, Phone, MapPin, Mail, Smartphone, Download, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Phone, MapPin, Mail } from 'lucide-react';
 
 // Protected Route Guard for Admin views
 const ProtectedAdminRoute: React.FC<{
@@ -129,10 +128,9 @@ export const App: React.FC = () => {
     }
   };
 
-  // PWA Mobile App Install Prompt
+  // Mobile App Direct Download & PWA Install
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
-  const [showDownloadModal, setShowDownloadModal] = useState<boolean>(false);
 
   useEffect(() => {
     const handleBeforeInstall = (e: any) => {
@@ -144,18 +142,29 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
-  const handleInstallApp = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    try {
-      const choice = await deferredPrompt.userChoice;
-      if (choice?.outcome === 'accepted') {
-        setShowInstallBanner(false);
+  const handleDownloadApp = async () => {
+    // 1. If native PWA install prompt is primed, trigger it immediately
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice?.outcome === 'accepted') {
+          setShowInstallBanner(false);
+          setDeferredPrompt(null);
+          return;
+        }
+      } catch {
+        // Continue to direct APK download
       }
-    } catch {
-      // Ignored
     }
-    setDeferredPrompt(null);
+
+    // 2. Direct browser download of KaveriClub.apk
+    const link = document.createElement('a');
+    link.href = '/KaveriClub.apk';
+    link.download = 'KaveriClub.apk';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Check stored sessions and verify with server on mount
@@ -300,7 +309,7 @@ export const App: React.FC = () => {
         onAdminLogout={handleAdminLogout}
         loggedInMember={loggedInMember}
         onMemberLogout={handleMemberLogout}
-        onOpenDownloadApp={() => setShowDownloadModal(true)}
+        onOpenDownloadApp={handleDownloadApp}
       />
 
       {/* PWA Mobile App Install Bar */}
@@ -314,7 +323,7 @@ export const App: React.FC = () => {
           </div>
           <div className="flex items-center space-x-2">
             <button
-              onClick={handleInstallApp}
+              onClick={handleDownloadApp}
               className="px-3.5 py-1.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-brand-950 font-black text-xs shadow-sm transition-all cursor-pointer"
             >
               Install App
@@ -501,105 +510,6 @@ export const App: React.FC = () => {
           </div>
         </div>
       </footer>
-
-      {/* Official App Download & Installation Modal */}
-      <Modal
-        isOpen={showDownloadModal}
-        onClose={() => setShowDownloadModal(false)}
-        title="Download Kaveri Member Club App"
-        maxWidth="max-w-lg"
-      >
-        <div className="space-y-5 text-slate-800">
-          {/* Header Card */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-brand-950 via-brand-900 to-indigo-950 text-white flex items-center space-x-4 shadow-lg border border-gold-400/30">
-            <img
-              src="/logo.png"
-              alt="Kaveri Electronic Halaguru"
-              className="w-16 h-16 object-contain rounded-2xl bg-slate-900/80 p-1 border border-gold-400/50 shadow-md flex-shrink-0"
-            />
-            <div>
-              <div className="flex items-center space-x-2">
-                <Smartphone className="w-4 h-4 text-gold-400" />
-                <span className="font-extrabold text-white text-base">Kaveri Member Club</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold-500/20 text-gold-300 border border-gold-400/30 uppercase">
-                  Official App
-                </span>
-              </div>
-              <p className="text-xs text-brand-200 mt-1 leading-snug">
-                Install our official mobile app directly on your phone for instant card access, offline support, and zero download storage.
-              </p>
-            </div>
-          </div>
-
-          {/* 1-Tap Direct Install Button if supported */}
-          {deferredPrompt && (
-            <button
-              onClick={() => {
-                handleInstallApp();
-                setShowDownloadModal(false);
-              }}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-400 hover:to-amber-400 text-brand-950 font-black text-sm rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer border border-gold-300"
-            >
-              <Download className="w-5 h-5" />
-              <span>Install Kaveri App with 1-Tap Now</span>
-            </button>
-          )}
-
-          {/* Step-by-Step Installation Instructions */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">
-              Easy Installation Instructions
-            </h4>
-
-            {/* Android Chrome */}
-            <div className="p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-xs space-y-1.5">
-              <div className="flex items-center space-x-2 font-bold text-slate-900">
-                <span className="text-base">🤖</span>
-                <span>For Android (Google Chrome / Samsung Browser):</span>
-              </div>
-              <ol className="list-decimal list-inside text-slate-600 space-y-1 pl-1">
-                <li>Tap the <strong>3 vertical dots (⋮)</strong> at the top right of your browser.</li>
-                <li>Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</li>
-                <li>Tap <strong>"Add"</strong> — Kaveri Club App is installed immediately!</li>
-              </ol>
-            </div>
-
-            {/* Apple iPhone iOS */}
-            <div className="p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-xs space-y-1.5">
-              <div className="flex items-center space-x-2 font-bold text-slate-900">
-                <span className="text-base">🍏</span>
-                <span>For iPhone / iPad (Safari Browser):</span>
-              </div>
-              <ol className="list-decimal list-inside text-slate-600 space-y-1 pl-1">
-                <li>Tap the <strong>Share button</strong> (square icon with an arrow pointing up) at the bottom.</li>
-                <li>Scroll down the menu and tap <strong>"Add to Home Screen"</strong>.</li>
-                <li>Tap <strong>"Add"</strong> in the top-right corner to finish.</li>
-              </ol>
-            </div>
-          </div>
-
-          {/* Feature highlights */}
-          <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
-            <div className="flex items-center space-x-1.5 p-2 bg-emerald-50 rounded-lg text-emerald-900">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-              <span>Works 100% Offline</span>
-            </div>
-            <div className="flex items-center space-x-1.5 p-2 bg-blue-50 rounded-lg text-blue-900">
-              <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-              <span>Instant Card Scanning</span>
-            </div>
-          </div>
-
-          <div className="pt-2 flex justify-end">
-            <button
-              onClick={() => setShowDownloadModal(false)}
-              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };

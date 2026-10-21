@@ -108,6 +108,18 @@ if os.path.isdir(dist_path):
         if full_path.startswith("api/"):
             return {"detail": "Not Found"}
 
+        # Direct download for KaveriClub Android APK
+        if full_path in ["KaveriClub.apk", "downloads/KaveriClub.apk"]:
+            apk_path = os.path.join(dist_path, "KaveriClub.apk")
+            if not os.path.isfile(apk_path):
+                apk_path = os.path.join(os.path.dirname(dist_path), "public", "KaveriClub.apk")
+            if os.path.isfile(apk_path):
+                return FileResponse(
+                    apk_path,
+                    media_type="application/vnd.android.package-archive",
+                    filename="KaveriClub.apk"
+                )
+
         # Serve existing static file (e.g. logo.png, favicon.png, sw.js, manifest.json)
         candidate = os.path.join(dist_path, full_path)
         if full_path and os.path.isfile(candidate):
