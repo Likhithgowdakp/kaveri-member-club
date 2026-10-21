@@ -10,6 +10,15 @@
     <meta name="author" content="Kaveri Electronic Halaguru" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://lime-paint-winter-answering.trycloudflare.com" />
+    
+    <!-- PWA Mobile App Support -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#172554" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Kaveri Club" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
 
     <!-- OpenGraph Social & Google Snippet Tags -->
     <meta property="og:type" content="business.business" />
@@ -66,5 +75,14 @@
   <body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen selection:bg-brand-500 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(err => {
+            console.log('SW registration error:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

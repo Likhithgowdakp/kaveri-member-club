@@ -79,3 +79,12 @@ app.include_router(campaigns_router, prefix=settings.API_V1_PREFIX)
 app.include_router(webhooks_router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit_router, prefix=settings.API_V1_PREFIX)
 app.include_router(settings_router, prefix=settings.API_V1_PREFIX)
+
+# Mount built frontend dist if present (Unified Single-Port Production Serving)
+import os
+from fastapi.staticfiles import StaticFiles
+
+dist_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "dist")
+if os.path.isdir(dist_path):
+    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static_frontend")
+

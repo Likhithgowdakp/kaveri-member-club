@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: kaveri-member-club
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ENV
+        value: production
+      - key: DEBUG
+        value: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: BUSINESS_NAME
+        value: "Kaveri Electronic Halaguru"
+      - key: BUSINESS_PHONE
+        value: "+91 72041 62882"
+      - key: BUSINESS_EMAIL
+        value: "mathrushreemep@gmail.com"

@@ -99,6 +99,34 @@ export const App: React.FC = () => {
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [prefMemberNumber, setPrefMemberNumber] = useState<string>('');
 
+  // PWA Mobile App Install Prompt
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    try {
+      const choice = await deferredPrompt.userChoice;
+      if (choice?.outcome === 'accepted') {
+        setShowInstallBanner(false);
+      }
+    } catch {
+      // Ignored
+    }
+    setDeferredPrompt(null);
+  };
+
   // Check stored sessions and verify with server on mount
   useEffect(() => {
     const initSessions = async () => {
@@ -242,6 +270,33 @@ export const App: React.FC = () => {
         loggedInMember={loggedInMember}
         onMemberLogout={handleMemberLogout}
       />
+
+      {/* PWA Mobile App Install Bar */}
+      {showInstallBanner && (
+        <div className="no-print bg-gradient-to-r from-brand-950 via-brand-900 to-indigo-950 text-white px-4 py-2.5 flex items-center justify-between text-xs shadow-md border-b border-brand-800">
+          <div className="flex items-center space-x-2.5">
+            <span className="text-base">📲</span>
+            <span>
+              Install <strong>Kaveri Club Official App</strong> on your phone for 1-tap card access!
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleInstallApp}
+              className="px-3.5 py-1.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-brand-950 font-black text-xs shadow-sm transition-all cursor-pointer"
+            >
+              Install App
+            </button>
+            <button
+              onClick={() => setShowInstallBanner(false)}
+              className="p-1 text-slate-400 hover:text-white text-xs"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1">
