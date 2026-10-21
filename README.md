@@ -1,8 +1,22 @@
 # Kaveri Member Club
-### Customer Loyalty, DPDP Consent & Promotional Campaign Management System
+### Official Customer Loyalty, DPDP Consent & Member Portal
 **For**: Kaveri Electronic Halaguru  
 **Location**: HMS Complex, Kanakapura Main Road, Halaguru Hobli, Karnataka - 571421, India  
-**Store Hours**: Monday – Sunday, 9:30 AM to 9:00 PM IST • **Support**: +91 94481 23456
+**Store Support**: +91 72041 62882 • mathrushreemep@gmail.com
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Likhithgowdakp/kaveri-member-club)
+
+---
+
+## 🌐 Live Access & Deployment
+
+- **GitHub Repository**: [https://github.com/Likhithgowdakp/kaveri-member-club](https://github.com/Likhithgowdakp/kaveri-member-club)
+- **1-Click Permanent Cloud Deployment**: [Deploy to Render 24/7](https://render.com/deploy?repo=https://github.com/Likhithgowdakp/kaveri-member-club)
+- **Active Live Tunnel**: [https://lime-paint-winter-answering.trycloudflare.com](https://lime-paint-winter-answering.trycloudflare.com)
+- **Private Admin Portal**: `https://lime-paint-winter-answering.trycloudflare.com/#admin/login`
+  - **Admin Username**: `Prabhu_kaveri`
+  - **Admin Password**: `PrabhuSwamy@1987`
+- **Android App Project**: Located in [`android_app/`](android_app/) with official production keystore in [`android_app/keystore/kaveri_release.keystore`](android_app/keystore/kaveri_release.keystore).
 
 ---
 
