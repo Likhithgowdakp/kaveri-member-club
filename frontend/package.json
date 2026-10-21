@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/jsbarcode": "^3.11.4",
+    "jsbarcode": "^3.12.3",
     "lucide-react": "^1.16.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",

@@ -382,11 +382,11 @@ export const App: React.FC = () => {
               <div className="space-y-1.5 text-xs">
                 <p className="flex items-center space-x-2 text-slate-300">
                   <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>+91 94481 23456</span>
+                  <a href="tel:+917204162882" className="hover:text-emerald-400 transition-colors">+91 72041 62882</a>
                 </p>
                 <p className="flex items-center space-x-2 text-slate-300">
                   <Mail className="w-3.5 h-3.5 text-blue-400" />
-                  <span>support@kaverielectronics.in</span>
+                  <a href="mailto:mathrushreemep@gmail.com" className="hover:text-blue-400 transition-colors">mathrushreemep@gmail.com</a>
                 </p>
                 <p className="text-[11px] text-slate-500 mt-2">
                   Store Hours: Monday – Sunday, 9:30 AM to 9:00 PM IST

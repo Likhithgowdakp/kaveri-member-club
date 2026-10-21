@@ -32,7 +32,7 @@ export const PrivacyPage: React.FC = () => {
             </p>
             <p className="flex items-center space-x-2">
               <Mail className="w-3.5 h-3.5 text-brand-700" />
-              <span>Grievance Officer: support@kaverielectronics.in</span>
+              <span>Grievance Officer: mathrushreemep@gmail.com | Phone: +91 72041 62882</span>
             </p>
           </div>
         </section>

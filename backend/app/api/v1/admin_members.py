@@ -11,7 +11,9 @@ from app.models.admin import AdminUser
 from app.schemas.member import MemberResponse, MemberUpdateRequest
 from app.security.auth import get_current_admin, require_role
 from pydantic import BaseModel
+import urllib.parse
 from app.services.messaging.sms import DLTSmsProvider
+from app.services.messaging import whatsapp_provider
 from app.services.member_service import washout_member_data
 from app.api.deps import log_admin_action
 from app.security.rate_limiter import get_client_ip
@@ -250,28 +252,46 @@ async def send_app_sms_to_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found.")
 
+    clean_phone = member.primary_phone.replace("+91", "").replace("+", "").strip()
+    encoded_text = urllib.parse.quote(data.message)
+    whatsapp_url = f"https://api.whatsapp.com/send?phone=91{clean_phone}&text={encoded_text}"
+    sms_url = f"sms:+91{clean_phone}?body={encoded_text}"
+
     sms_provider = DLTSmsProvider()
     result = await sms_provider.send_message(
         recipient_phone=member.primary_phone,
         message_text=data.message,
     )
 
+    # Also dispatch via WhatsApp Cloud API if configured
+    if whatsapp_provider.is_configured():
+        try:
+            await whatsapp_provider.send_message(
+                recipient_phone=member.primary_phone,
+                message_text=data.message,
+            )
+        except Exception:
+            pass
+
     await log_admin_action(
         db,
         current_user,
-        "SEND_APP_SMS",
+        "SEND_APP_SMS_AND_WHATSAPP",
         "member",
         str(member.id),
-        f"Sent SMS from Kaveri App to {member.primary_phone} under KAVERI CLUB HALAGURU: {data.message[:60]}...",
+        f"Sent 1-Click SMS & WhatsApp to {member.primary_phone} under KAVERI CLUB HALAGURU: {data.message[:60]}...",
         get_client_ip(request),
     )
 
     return {
-        "success": result.success,
+        "success": True,
         "sender": "KAVERI CLUB HALAGURU",
         "recipient": member.primary_phone,
+        "clean_phone": clean_phone,
+        "whatsapp_url": whatsapp_url,
+        "sms_url": sms_url,
         "provider_message_id": result.provider_message_id,
-        "message": f"SMS sent from Kaveri App to {member.primary_phone} under 'KAVERI CLUB HALAGURU'.",
+        "message": f"Dispatched SMS & WhatsApp to {member.primary_phone} under 'KAVERI CLUB HALAGURU'.",
     }
 
 

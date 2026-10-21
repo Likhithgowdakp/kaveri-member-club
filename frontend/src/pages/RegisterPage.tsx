@@ -365,7 +365,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
           <div>
             <h4 className="font-bold text-slate-900 text-sm mb-1">1. Data Fiduciary</h4>
             <p>
-              <strong>Kaveri Electronic Halaguru</strong>, HMS Complex, Kanakapura Main Road, Halaguru Hobli, Karnataka - 571421. Contact: support@kaverielectronics.in.
+              <strong>Kaveri Electronic Halaguru</strong>, HMS Complex, Kanakapura Main Road, Halaguru Hobli, Karnataka - 571421. Contact: mathrushreemep@gmail.com | Phone: +91 72041 62882.
             </p>
           </div>
 

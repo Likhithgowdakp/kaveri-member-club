@@ -339,7 +339,7 @@ export const AdminWhatsAppGroup: React.FC = () => {
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-100 text-[10px] text-slate-400">
-              Direct Contact: +91 94481 23456 • Monday to Sunday 9:30 AM – 9:00 PM
+              Direct Contact: +91 72041 62882 • Monday to Sunday 9:30 AM – 9:00 PM
             </div>
           </div>
         </div>
