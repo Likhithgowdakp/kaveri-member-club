@@ -13,7 +13,13 @@ from app.schemas.member import MemberResponse, MemberUpdateRequest, PaymentRejec
 from app.security.auth import get_current_admin, require_role
 from pydantic import BaseModel
 import urllib.parse
-from app.services.messaging.sms import DLTSmsProvider
+from app.config import settings
+from app.services.messaging.sms import (
+    DLTSmsProvider,
+    dispatch_payment_approved_sms,
+    dispatch_payment_rejected_sms,
+    dispatch_card_link_sms,
+)
 from app.services.messaging import whatsapp_provider
 from app.services.member_service import washout_member_data
 from app.api.deps import log_admin_action
@@ -136,13 +142,9 @@ async def approve_member_payment(
     await db.commit()
     await db.refresh(member)
 
-    # Dispatch official welcome SMS under KAVERI CLUB HALAGURU
+    # Dispatch official welcome & card activation SMS under KAVERI CLUB HALAGURU
     clean_phone = "".join(filter(str.isdigit, member.primary_phone))[-10:]
-    welcome_sms = (
-        f"Namaskara {member.full_name}! Your payment of Rs {member.payment_amount} is verified against store bank records and approved. "
-        f"Welcome to KAVERI CLUB HALAGURU! Member ID: {member.member_number} ({member.loyalty_points} loyalty pts). "
-        f"Your digital card is now active! Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru."
-    )
+    card_url = f"{settings.BUSINESS_PUBLIC_URL}/card"
 
     stmt_key = select(StoreSetting).where(StoreSetting.key == "sms_api_key")
     res_key = await db.execute(stmt_key)
@@ -155,9 +157,12 @@ async def approve_member_payment(
     active_sender = row_sender.value if row_sender and row_sender.value else None
 
     sms_provider = DLTSmsProvider(api_key=active_sms_key, sender_id=active_sender)
-    await sms_provider.send_message(
+    sms_res = await dispatch_payment_approved_sms(
+        sms_provider=sms_provider,
         recipient_phone=clean_phone,
-        message_text=welcome_sms,
+        full_name=member.full_name,
+        member_number=member.member_number,
+        card_url=card_url,
     )
 
     await log_admin_action(
@@ -166,13 +171,16 @@ async def approve_member_payment(
         "APPROVE_PAYMENT_AND_ISSUE_CARD",
         "member",
         str(member.id),
-        f"Verified ₹{member.payment_amount} payment against store bank records for UPI ID 7353398831-2@naviaxis (UTR: {member.payment_utr or 'N/A'}). Approved for {member.member_number} ({member.full_name}, +91{clean_phone}). Digital membership card unlocked.",
+        f"Verified ₹{member.payment_amount} payment against store bank records for UPI ID 7353398831-2@naviaxis (UTR: {member.payment_utr or 'N/A'}). Approved for {member.member_number} ({member.full_name}, +91{clean_phone}). Digital membership card unlocked. SMS Status: {sms_res.status} (Provider ID: {sms_res.provider_message_id or 'None'}).",
         get_client_ip(request),
     )
 
     return {
         "success": True,
-        "message": f"Payment approved for {member.member_number} ({member.full_name}). Card activated and welcome SMS dispatched.",
+        "message": f"Payment approved for {member.member_number} ({member.full_name}). Card activated. "
+        + ("SMS notification delivered." if sms_res.success else f"SMS alert: {sms_res.error_message or sms_res.status}"),
+        "sms_status": sms_res.status,
+        "sms_provider_id": sms_res.provider_message_id,
         "member": MemberResponse.model_validate(member),
     }
 
@@ -194,7 +202,7 @@ async def reject_member_payment(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found.")
 
-    reason = data.reason.strip() if data.reason and data.reason.strip() else "Payment proof could not be verified by store manager."
+    reason = data.reason.strip() if data.reason and data.reason.strip() else "Payment proof could not be verified against bank records."
     now = datetime.now(timezone.utc)
     member.payment_status = "rejected"
     member.status = "rejected"
@@ -204,19 +212,45 @@ async def reject_member_payment(
     await db.commit()
     await db.refresh(member)
 
+    # Dispatch rejection notification SMS
+    clean_phone = "".join(filter(str.isdigit, member.primary_phone))[-10:]
+    card_url = f"{settings.BUSINESS_PUBLIC_URL}/card"
+
+    stmt_key = select(StoreSetting).where(StoreSetting.key == "sms_api_key")
+    res_key = await db.execute(stmt_key)
+    row_key = res_key.scalar_one_or_none()
+    active_sms_key = row_key.value if row_key and row_key.value else None
+
+    stmt_sender = select(StoreSetting).where(StoreSetting.key == "sms_sender_id")
+    res_sender = await db.execute(stmt_sender)
+    row_sender = res_sender.scalar_one_or_none()
+    active_sender = row_sender.value if row_sender and row_sender.value else None
+
+    sms_provider = DLTSmsProvider(api_key=active_sms_key, sender_id=active_sender)
+    sms_res = await dispatch_payment_rejected_sms(
+        sms_provider=sms_provider,
+        recipient_phone=clean_phone,
+        full_name=member.full_name,
+        member_number=member.member_number,
+        rejection_reason=reason,
+        card_url=card_url,
+    )
+
     await log_admin_action(
         db,
         current_user,
         "REJECT_PAYMENT",
         "member",
         str(member.id),
-        f"Rejected ₹{member.payment_amount} payment for {member.member_number} ({member.full_name}): {reason}",
+        f"Rejected ₹{member.payment_amount} payment for {member.member_number} ({member.full_name}): {reason}. SMS Status: {sms_res.status}.",
         get_client_ip(request),
     )
 
     return {
         "success": True,
         "message": f"Payment submission rejected for {member.member_number}. Customer can re-upload screenshot.",
+        "sms_status": sms_res.status,
+        "sms_provider_id": sms_res.provider_message_id,
         "member": MemberResponse.model_validate(member),
     }
 

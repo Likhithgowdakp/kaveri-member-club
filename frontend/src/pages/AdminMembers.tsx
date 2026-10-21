@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   X,
   ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 
 interface AdminMembersProps {
@@ -31,7 +32,9 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const [dispatchMap, setDispatchMap] = useState<Record<number, { loading?: boolean; sent?: boolean; note?: string }>>({});
+  const [dispatchMap, setDispatchMap] = useState<
+    Record<number, { loading?: boolean; sent?: boolean; error?: boolean; note?: string }>
+  >({});
 
   // ₹499 Payment Approvals State
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
@@ -56,31 +59,55 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
     const cleanPhone = m.primary_phone.replace(/[^0-9]/g, '').slice(-10);
     const msg = `Namaskara ${m.full_name}! Welcome to KAVERI CLUB HALAGURU. Your Member ID is ${m.member_number} with ${m.loyalty_points || 50} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri.`;
 
-    // DO NOT open WhatsApp. Send directly through the application server on 1 click!
+    // Direct 1-click dispatch through backend cellular SMS service
     setDispatchMap((prev) => ({
       ...prev,
-      [m.id]: { loading: true, sent: false, note: 'Dispatching SMS...' },
+      [m.id]: { loading: true, sent: false, error: false, note: 'Dispatching SMS...' },
     }));
 
     try {
       const res = await api.sendAppSms(m.id, msg);
-      const isDry = res?.is_dry_run;
-      setDispatchMap((prev) => ({
-        ...prev,
-        [m.id]: {
-          loading: false,
-          sent: true,
-          note: isDry ? `✓ SMS Dispatched to +91 ${cleanPhone}` : `✓ SMS Sent to +91 ${cleanPhone}`,
-        },
-      }));
+      if (res?.success && !res?.is_dry_run) {
+        setDispatchMap((prev) => ({
+          ...prev,
+          [m.id]: {
+            loading: false,
+            sent: true,
+            error: false,
+            note: `✓ SMS Sent to +91 ${cleanPhone} (ID: ${res.provider_message_id || 'OK'})`,
+          },
+        }));
+      } else if (res?.is_dry_run || res?.status === 'not_configured' || res?.status === 'dry_run') {
+        setDispatchMap((prev) => ({
+          ...prev,
+          [m.id]: {
+            loading: false,
+            sent: false,
+            error: true,
+            note: '⚠️ SMS Key Missing in Settings (Simulated)',
+          },
+        }));
+      } else {
+        const errorReason = res?.error_message || res?.status || 'SMS Gateway rejected request';
+        setDispatchMap((prev) => ({
+          ...prev,
+          [m.id]: {
+            loading: false,
+            sent: false,
+            error: true,
+            note: `❌ SMS Failed: ${errorReason}`,
+          },
+        }));
+      }
     } catch (err: any) {
       console.warn('Backend SMS dispatch error:', err);
       setDispatchMap((prev) => ({
         ...prev,
         [m.id]: {
           loading: false,
-          sent: true,
-          note: `✓ SMS Dispatched to +91 ${cleanPhone}`,
+          sent: false,
+          error: true,
+          note: `❌ SMS Failed: ${err?.detail || err?.message || 'Gateway error'}`,
         },
       }));
     }
@@ -88,9 +115,9 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
     setTimeout(() => {
       setDispatchMap((prev) => ({
         ...prev,
-        [m.id]: { loading: false, sent: false, note: '' },
+        [m.id]: { loading: false, sent: false, error: false, note: '' },
       }));
-    }, 10000);
+    }, 12000);
   };
 
   const fetchMembers = async () => {
@@ -536,6 +563,14 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
                               <span className="px-3 py-1.5 rounded-lg bg-brand-800 text-white font-bold text-[10px] flex items-center space-x-1.5 shadow-sm">
                                 <span className="animate-spin text-gold-400">⏳</span>
                                 <span>Sending SMS...</span>
+                              </span>
+                            ) : dispatchMap[m.id]?.error ? (
+                              <span
+                                className="px-2.5 py-1.5 rounded-lg bg-rose-600 text-white font-bold text-[10px] flex items-center space-x-1.5 shadow-sm cursor-help"
+                                title={dispatchMap[m.id]?.note}
+                              >
+                                <AlertCircle className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                                <span className="truncate max-w-[170px]">{dispatchMap[m.id]?.note}</span>
                               </span>
                             ) : dispatchMap[m.id]?.sent ? (
                               <span className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[10px] flex items-center space-x-1.5 shadow-sm">

@@ -17,7 +17,8 @@ from app.schemas.member import (
 from app.schemas.consent import CustomerPreferencesResponse, ConsentItem
 from app.services.consent_service import get_all_consents_for_member
 from app.services.member_service import register_member
-from app.services.messaging.sms import DLTSmsProvider
+from app.models.setting import StoreSetting
+from app.services.messaging.sms import DLTSmsProvider, dispatch_payment_submitted_sms
 from app.security.hashing import verify_password
 from app.security.rate_limiter import rate_limit, get_client_ip
 
@@ -148,6 +149,27 @@ async def submit_customer_payment_info(
 
     await db.commit()
     await db.refresh(member)
+
+    # Dispatch Event 1 SMS: Payment verification pending
+    clean_phone = "".join(filter(str.isdigit, member.primary_phone))[-10:]
+    stmt_key = select(StoreSetting).where(StoreSetting.key == "sms_api_key")
+    res_key = await db.execute(stmt_key)
+    row_key = res_key.scalar_one_or_none()
+    active_sms_key = row_key.value if row_key and row_key.value else None
+
+    stmt_sender = select(StoreSetting).where(StoreSetting.key == "sms_sender_id")
+    res_sender = await db.execute(stmt_sender)
+    row_sender = res_sender.scalar_one_or_none()
+    active_sender = row_sender.value if row_sender and row_sender.value else None
+
+    sms_provider = DLTSmsProvider(api_key=active_sms_key, sender_id=active_sender)
+    await dispatch_payment_submitted_sms(
+        sms_provider=sms_provider,
+        recipient_phone=clean_phone,
+        full_name=member.full_name,
+        member_number=member.member_number,
+        utr=clean_utr,
+    )
 
     return {
         "success": True,

@@ -277,4 +277,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  testSms: (phone: string, message?: string) =>
+    request<any>('/settings/admin/test-sms', {
+      method: 'POST',
+      body: JSON.stringify({ phone, message }),
+    }),
 };

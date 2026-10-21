@@ -31,6 +31,11 @@ export const AdminWhatsAppGroup: React.FC = () => {
   const [smsError, setSmsError] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
 
+  // Test SMS state
+  const [testPhone, setTestPhone] = useState('');
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
   // UPI Payment Settings
   const [upiId, setUpiId] = useState('7353398831-2@naviaxis');
   const [membershipFee, setMembershipFee] = useState(499);
@@ -39,6 +44,33 @@ export const AdminWhatsAppGroup: React.FC = () => {
   const [upiError, setUpiError] = useState<string | null>(null);
 
   const printRef = useRef<HTMLDivElement>(null);
+
+  const handleSendTestSms = async () => {
+    if (!testPhone.trim()) return;
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const res = await api.testSms(testPhone.trim());
+      if (res.success) {
+        setTestResult({
+          success: true,
+          message: `✓ Test SMS Delivered to +91 ${testPhone.trim()}! Gateway Message ID: ${res.provider_message_id}`,
+        });
+      } else {
+        setTestResult({
+          success: false,
+          message: `❌ ${res.error_message || res.status || 'Failed to dispatch test SMS'}`,
+        });
+      }
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: `❌ ${err?.detail || err?.message || 'Network error'}`,
+      });
+    } finally {
+      setTestLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadSettings();
@@ -406,6 +438,46 @@ export const AdminWhatsAppGroup: React.FC = () => {
                 </button>
               </div>
             </form>
+
+            {/* Test SMS Gateway Box */}
+            <div className="pt-4 border-t border-slate-100 space-y-2.5">
+              <h3 className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                <Smartphone className="w-4 h-4 text-brand-700" />
+                <span>Test Live Cellular SMS Delivery</span>
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Enter your mobile number to send a test SMS and verify your gateway key is working:
+              </p>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="tel"
+                  maxLength={10}
+                  placeholder="10-digit mobile (e.g. 7204162882)"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendTestSms}
+                  disabled={testLoading || !testPhone.trim()}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-sm disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  {testLoading ? 'Testing...' : 'Send Test SMS'}
+                </button>
+              </div>
+              {testResult && (
+                <div
+                  className={`p-3 rounded-xl text-xs flex items-start space-x-2 ${
+                    testResult.success
+                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-900 border border-rose-200'
+                  }`}
+                >
+                  <span>{testResult.message}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Card 3: ₹499 UPI Payment Settings */}

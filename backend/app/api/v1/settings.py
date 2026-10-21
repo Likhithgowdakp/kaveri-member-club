@@ -72,7 +72,7 @@ async def get_admin_settings(
         "sms_api_key_configured": bool(saved_sms_key and saved_sms_key.strip()),
         "sms_api_key_masked": masked_sms_key,
         "sms_sender_id": saved_settings.get("sms_sender_id", settings.SMS_SENDER_ID or "KAVERI"),
-        "store_upi_id": saved_settings.get("store_upi_id", "7204162882@ybl"),
+        "store_upi_id": saved_settings.get("store_upi_id", "7353398831-2@naviaxis"),
         "membership_fee": int(saved_settings.get("membership_fee", "499")),
     }
 
@@ -215,3 +215,49 @@ async def update_admin_settings(
 
     await db.commit()
     return {"message": "Store, UPI payment, WhatsApp, and SMS settings saved successfully."}
+
+
+class AdminTestSmsRequest(BaseModel):
+    phone: str
+    message: Optional[str] = None
+
+
+@router.post("/admin/test-sms")
+async def test_sms_gateway(
+    data: AdminTestSmsRequest,
+    current_user: AdminUser = Depends(require_role(["owner", "manager"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Direct test dispatch to verify Fast2SMS / MSG91 API configuration with an actual phone.
+    Returns the real raw response from the gateway so the admin can verify delivery status.
+    """
+    from app.services.messaging.sms import DLTSmsProvider
+
+    stmt_key = select(StoreSetting).where(StoreSetting.key == "sms_api_key")
+    res_key = await db.execute(stmt_key)
+    row_key = res_key.scalar_one_or_none()
+    active_sms_key = row_key.value if row_key and row_key.value else None
+
+    stmt_sender = select(StoreSetting).where(StoreSetting.key == "sms_sender_id")
+    res_sender = await db.execute(stmt_sender)
+    row_sender = res_sender.scalar_one_or_none()
+    active_sender = row_sender.value if row_sender and row_sender.value else None
+
+    sms_provider = DLTSmsProvider(api_key=active_sms_key, sender_id=active_sender)
+
+    test_msg = data.message or "Namaskara! This is a test SMS from Kaveri Electronic Halaguru (Kaveri Member Club). Integration test successful!"
+    result = await sms_provider.send_message(
+        recipient_phone=data.phone,
+        message_text=test_msg,
+    )
+
+    return {
+        "success": result.success,
+        "status": result.status,
+        "is_dry_run": result.is_dry_run,
+        "provider_message_id": result.provider_message_id,
+        "error_message": result.error_message,
+        "details": result.details,
+    }
+

@@ -237,15 +237,15 @@ export const App: React.FC = () => {
       const sub = tab.replace('admin-', '');
       window.history.pushState(null, '', `/admin/${sub}`);
     } else if (tab === 'register') {
-      window.history.pushState(null, '', '/#register');
+      window.history.pushState(null, '', '/');
     } else if (tab === 'member-login') {
-      window.history.pushState(null, '', '/#login');
+      window.history.pushState(null, '', '/login');
     } else if (tab === 'card') {
-      window.history.pushState(null, '', '/#card');
+      window.history.pushState(null, '', '/card');
     } else if (tab === 'preferences') {
-      window.history.pushState(null, '', '/#preferences');
+      window.history.pushState(null, '', '/preferences');
     } else if (tab === 'privacy') {
-      window.history.pushState(null, '', '/#privacy');
+      window.history.pushState(null, '', '/privacy');
     }
   };
 

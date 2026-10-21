@@ -79,17 +79,41 @@ async def process_whatsapp_events(
     return {"status": "ok"}
 
 
-@router.post("/sms/dlr")
+@router.api_route("/sms/dlr", methods=["GET", "POST"])
+@router.api_route("/sms-delivery-report", methods=["GET", "POST"])
 async def process_sms_delivery_receipt(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Processes DLT SMS delivery receipt callback from Indian SMS gateway.
+    Processes SMS delivery receipt (DLR) callback from Fast2SMS, MSG91, or TRAI DLT gateways.
+    Supports both JSON POST payloads and URL query string callbacks.
     """
-    data = await request.json()
-    msg_id = data.get("request_id") or data.get("message_id")
-    dlr_status = data.get("status", "").lower()  # delivered, failed, rejected
+    data = {}
+    if request.method == "POST":
+        try:
+            data = await request.json()
+        except Exception:
+            try:
+                form = await request.form()
+                data = dict(form)
+            except Exception:
+                data = {}
+    else:
+        data = dict(request.query_params)
+
+    msg_id = (
+        data.get("request_id")
+        or data.get("message_id")
+        or data.get("requestId")
+        or data.get("id")
+    )
+    dlr_status = (
+        data.get("status")
+        or data.get("dlr_status")
+        or data.get("delivery_status")
+        or ""
+    ).lower()
 
     if msg_id:
         stmt = select(CampaignSendJob).where(
@@ -99,17 +123,17 @@ async def process_sms_delivery_receipt(
         job = res.scalar_one_or_none()
         if job:
             now = datetime.now(timezone.utc)
-            if dlr_status == "delivered":
+            if dlr_status in {"delivered", "success", "1", "d"}:
                 job.status = "delivered"
                 job.delivered_at = now
-            elif dlr_status in {"failed", "rejected", "undelivered"}:
+            elif dlr_status in {"failed", "rejected", "undelivered", "0", "f"}:
                 job.status = "failed"
-                job.error_message = data.get("reason", "SMS DLT Delivery Failed")
+                job.error_message = str(data.get("reason") or data.get("cause") or "SMS DLT Delivery Failed")
 
             job.updated_at = now
             event = MessageDeliveryEvent(
                 send_job_id=job.id,
-                provider="dlt_sms",
+                provider="sms_gateway",
                 event_type=dlr_status,
                 raw_payload=json.dumps(data),
                 created_at=now,
@@ -117,4 +141,5 @@ async def process_sms_delivery_receipt(
             db.add(event)
             await db.commit()
 
-    return {"status": "receipt_acknowledged"}
+    return {"status": "receipt_acknowledged", "received_id": msg_id, "status_recorded": dlr_status}
+
