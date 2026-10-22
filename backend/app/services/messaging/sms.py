@@ -55,8 +55,8 @@ class DLTSmsProvider(BaseMessagingProvider):
         self.provider = (provider or settings.SMS_PROVIDER or "fast2sms").lower()
 
     def is_configured(self) -> bool:
-        """Returns True ONLY when a non-empty API key is available."""
-        return bool(self.enabled and self.api_key and len(self.api_key) > 5)
+        """Returns True ONLY when a non-empty, unmasked API key is available."""
+        return bool(self.enabled and self.api_key and len(self.api_key) > 5 and "..." not in self.api_key)
 
     async def send_message(
         self,
@@ -84,7 +84,20 @@ class DLTSmsProvider(BaseMessagingProvider):
         if "KAVERI CLUB HALAGURU" not in formatted_message:
             formatted_message = f"[KAVERI CLUB HALAGURU] {formatted_message}"
 
-        # 3. Handle unconfigured state: Return dry_run without fake cellular delivery
+        # 3. Handle unconfigured state or masked key
+        if self.api_key and "..." in self.api_key:
+            return SendResult(
+                success=False,
+                status="invalid_key",
+                is_dry_run=False,
+                error_message=(
+                    "The Fast2SMS API key contains literal '...'. "
+                    "This happens when selecting masked text from the screen. "
+                    "Please click the 'Copy' button on fast2sms.com to copy the full 50-character key, "
+                    "or leave the key blank to use free dry-run mode."
+                ),
+            )
+
         if not self.is_configured():
             simulated_id = f"DRYRUN-SMS-{uuid.uuid4().hex[:10].upper()}"
             return SendResult(

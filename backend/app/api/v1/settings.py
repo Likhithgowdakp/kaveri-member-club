@@ -140,14 +140,14 @@ async def update_admin_settings(
 
     if update_data.sms_api_key is not None:
         key_val = update_data.sms_api_key.strip()
-        if key_val and not key_val.startswith("***"):
+        if not key_val.startswith("***"):
             stmt = select(StoreSetting).where(StoreSetting.key == "sms_api_key")
             res = await db.execute(stmt)
             setting = res.scalar_one_or_none()
             if setting:
                 setting.value = key_val
                 setting.updated_at = now
-            else:
+            elif key_val:
                 db.add(
                     StoreSetting(
                         key="sms_api_key",
