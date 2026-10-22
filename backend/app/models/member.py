@@ -25,7 +25,7 @@ class Member(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # ₹499 Membership Payment & Admin Approval
-    payment_status: Mapped[str] = mapped_column(String(30), default="approved", nullable=False)  # pending, approved, rejected
+    payment_status: Mapped[str] = mapped_column(String(30), default="not_submitted", nullable=False)  # not_submitted, pending, approved, rejected
     payment_amount: Mapped[int] = mapped_column(Integer, default=499, nullable=False)
     payment_screenshot: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # base64 data URL
     payment_utr: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # UPI reference / transaction ID

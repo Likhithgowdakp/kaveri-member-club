@@ -312,11 +312,10 @@ export const CardPage: React.FC<CardPageProps> = ({
 
   useEffect(() => {
     if (!member?.member_number) return;
-    const isPending =
-      member.payment_status === 'pending' || member.status === 'pending_verification';
-    if (!isPending) return;
+    const isApproved = member.payment_status === 'approved' && member.status === 'active';
+    if (isApproved) return;
 
-    // Check automatically every 3.5 seconds while payment verification is pending
+    // Check automatically every 3.5 seconds until payment is approved and active
     const interval = setInterval(() => {
       refreshMemberStatus();
     }, 3500);
@@ -496,8 +495,15 @@ export const CardPage: React.FC<CardPageProps> = ({
       {member && (() => {
         const isApproved = member.payment_status === 'approved' && member.status === 'active';
         const isRejected = member.payment_status === 'rejected';
-        const isPending = (member.payment_status === 'pending' || member.status === 'pending_verification') && !isApproved;
-        const isNotSubmitted = !isApproved && !isPending && !isRejected;
+
+        // Customer has submitted proof only if UTR or screenshot is present
+        const hasPaymentProof = Boolean(member.payment_utr || member.payment_screenshot);
+
+        // Payment Verification Pending is ONLY active when customer submitted proof and awaits admin approval
+        const isPending = !isApproved && !isRejected && hasPaymentProof && (member.payment_status === 'pending' || member.status === 'pending_verification');
+
+        // Payment Not Submitted is active for any registered member who has not submitted payment proof yet
+        const isNotSubmitted = !isApproved && !isRejected && !isPending;
 
         // Visual Stepper for the 5 Customer Account Statuses
         const renderStatusTracker = () => (
