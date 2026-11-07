@@ -8,7 +8,7 @@ interface NavbarProps {
   onAdminLogout: () => void;
   loggedInMember?: any;
   onMemberLogout?: () => void;
-  onOpenDownloadApp?: () => void;
+  onOpenDownloadApp?: (mode?: 'admin' | 'customer') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -228,6 +228,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                   Audit Logs
                 </button>
                 <div className="h-6 w-px bg-brand-800 mx-2" />
+                {onOpenDownloadApp && (
+                  <a
+                    href="/KaveriAdmin.apk"
+                    download="KaveriAdmin.apk"
+                    onClick={() => {
+                      if (onOpenDownloadApp) onOpenDownloadApp('admin');
+                    }}
+                    className="mr-1 px-3 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-gold-400 hover:from-amber-400 hover:to-gold-300 text-brand-950 shadow-md hover:shadow-lg transition-all flex items-center space-x-1.5 border border-amber-300 cursor-pointer group"
+                    title="Download Kaveri Admin App (KaveriAdmin.apk)"
+                  >
+                    <Smartphone className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                    <span>Admin App</span>
+                  </a>
+                )}
                 <button
                   onClick={onAdminLogout}
                   className="px-3 py-2 rounded-lg text-sm font-semibold text-rose-300 hover:bg-rose-950/40 hover:text-rose-200 transition-colors flex items-center space-x-1"
@@ -242,20 +256,37 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile actions & menu button */}
           <div className="md:hidden flex items-center space-x-2">
             {onOpenDownloadApp && (
-              <a
-                href="/KaveriClub.apk"
-                download="KaveriClub.apk"
-                onClick={() => {
-                  if (onOpenDownloadApp) {
-                    onOpenDownloadApp();
-                  }
-                }}
-                className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-gold-500 to-amber-500 text-brand-950 font-black text-xs shadow flex items-center space-x-1 border border-gold-300 active:scale-95 cursor-pointer"
-                title="Download Kaveri Club App (KaveriClub.apk)"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>App</span>
-              </a>
+              isAdminLoggedIn || currentTab.startsWith('admin-') ? (
+                <a
+                  href="/KaveriAdmin.apk"
+                  download="KaveriAdmin.apk"
+                  onClick={() => {
+                    if (onOpenDownloadApp) {
+                      onOpenDownloadApp('admin');
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-gold-400 text-brand-950 font-black text-xs shadow flex items-center space-x-1 border border-amber-300 active:scale-95 cursor-pointer"
+                  title="Download Kaveri Admin App (KaveriAdmin.apk)"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>Admin</span>
+                </a>
+              ) : (
+                <a
+                  href="/KaveriClub.apk"
+                  download="KaveriClub.apk"
+                  onClick={() => {
+                    if (onOpenDownloadApp) {
+                      onOpenDownloadApp('customer');
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-gold-500 to-amber-500 text-brand-950 font-black text-xs shadow flex items-center space-x-1 border border-gold-300 active:scale-95 cursor-pointer"
+                  title="Download Kaveri Club App (KaveriClub.apk)"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>App</span>
+                </a>
+              )
             )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -346,6 +377,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             </>
           ) : (
             <>
+              {onOpenDownloadApp && (
+                <a
+                  href="/KaveriAdmin.apk"
+                  download="KaveriAdmin.apk"
+                  onClick={() => {
+                    if (onOpenDownloadApp) onOpenDownloadApp('admin');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-amber-500 to-gold-400 text-brand-950 flex items-center justify-between shadow-md mb-2 cursor-pointer"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Smartphone className="w-4 h-4" />
+                    <span>Download Admin App (KaveriAdmin.apk)</span>
+                  </div>
+                  <span className="text-[10px] uppercase font-black bg-brand-950/20 px-2 py-0.5 rounded">
+                    Admin APK
+                  </span>
+                </a>
+              )}
               <button
                 onClick={() => handleNav('admin-dashboard')}
                 className="w-full text-left px-3 py-2.5 rounded-lg text-base font-semibold text-white hover:bg-brand-900"

@@ -108,7 +108,7 @@ if os.path.isdir(dist_path):
         if full_path.startswith("api/"):
             return {"detail": "Not Found"}
 
-        # Direct download for KaveriClub Android APK
+        # Direct download for Android APKs (Customer: KaveriClub.apk, Admin: KaveriAdmin.apk)
         if full_path in ["KaveriClub.apk", "downloads/KaveriClub.apk"]:
             apk_path = os.path.join(dist_path, "KaveriClub.apk")
             if not os.path.isfile(apk_path):
@@ -118,6 +118,17 @@ if os.path.isdir(dist_path):
                     apk_path,
                     media_type="application/vnd.android.package-archive",
                     filename="KaveriClub.apk"
+                )
+
+        if full_path in ["KaveriAdmin.apk", "downloads/KaveriAdmin.apk"]:
+            apk_path = os.path.join(dist_path, "KaveriAdmin.apk")
+            if not os.path.isfile(apk_path):
+                apk_path = os.path.join(os.path.dirname(dist_path), "public", "KaveriAdmin.apk")
+            if os.path.isfile(apk_path):
+                return FileResponse(
+                    apk_path,
+                    media_type="application/vnd.android.package-archive",
+                    filename="KaveriAdmin.apk"
                 )
 
         # Serve existing static file (e.g. logo.png, favicon.png, sw.js, manifest.json)

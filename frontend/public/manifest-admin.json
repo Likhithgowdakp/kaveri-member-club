@@ -1,0 +1,26 @@
+{
+  "name": "Kaveri Club Admin Portal",
+  "short_name": "Kaveri Admin",
+  "description": "Store Administration & Payment Verification Portal for Kaveri Electronic, Halaguru",
+  "start_url": "/admin/login",
+  "scope": "/admin",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "management"]
+}

@@ -142,7 +142,25 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
-  const handleDownloadApp = async () => {
+  // Dynamically update PWA manifest and title based on active view (Admin vs Customer)
+  useEffect(() => {
+    const isAdmin = currentTab.startsWith('admin-');
+    const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+    if (manifestLink) {
+      manifestLink.href = isAdmin ? '/manifest-admin.json' : '/manifest.json';
+    }
+    const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]') as HTMLMetaElement;
+    if (appleTitle) {
+      appleTitle.content = isAdmin ? 'Kaveri Admin' : 'Kaveri Club';
+    }
+    document.title = isAdmin
+      ? 'Kaveri Club Admin Portal | Kaveri Electronic Halaguru'
+      : 'KAVERI CLUB HALAGURU | Kaveri Electronic Halaguru Official Portal';
+  }, [currentTab]);
+
+  const handleDownloadApp = async (targetMode?: 'admin' | 'customer') => {
+    const isAdminApp = targetMode === 'admin' || (!targetMode && currentTab.startsWith('admin-'));
+
     // 1. If native PWA install prompt is primed, trigger it immediately
     if (deferredPrompt) {
       try {
@@ -158,10 +176,11 @@ export const App: React.FC = () => {
       }
     }
 
-    // 2. Direct browser download of KaveriClub.apk
+    // 2. Direct browser download of appropriate APK
+    const apkFile = isAdminApp ? 'KaveriAdmin.apk' : 'KaveriClub.apk';
     const link = document.createElement('a');
-    link.href = '/KaveriClub.apk';
-    link.download = 'KaveriClub.apk';
+    link.href = `/${apkFile}`;
+    link.download = apkFile;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -318,15 +337,19 @@ export const App: React.FC = () => {
           <div className="flex items-center space-x-2.5">
             <span className="text-base">📲</span>
             <span>
-              Install <strong>Kaveri Club Official App</strong> on your phone for 1-tap card access!
+              {currentTab.startsWith('admin-') ? (
+                <>Install <strong>Kaveri Admin Portal App</strong> for 1-tap admin & payment approvals!</>
+              ) : (
+                <>Install <strong>Kaveri Club Official App</strong> on your phone for 1-tap card access!</>
+              )}
             </span>
           </div>
           <div className="flex items-center space-x-2">
             <button
-              onClick={handleDownloadApp}
+              onClick={() => handleDownloadApp()}
               className="px-3.5 py-1.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-brand-950 font-black text-xs shadow-sm transition-all cursor-pointer"
             >
-              Install App
+              {currentTab.startsWith('admin-') ? 'Install Admin App' : 'Install App'}
             </button>
             <button
               onClick={() => setShowInstallBanner(false)}

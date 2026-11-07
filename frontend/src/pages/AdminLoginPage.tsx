@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { Modal } from '../components/Modal';
-import { Lock, User, AlertCircle, KeyRound } from 'lucide-react';
+import { Lock, User, AlertCircle, KeyRound, Smartphone, Download } from 'lucide-react';
 
 interface AdminLoginPageProps {
   onLoginSuccess: (user: any) => void;
@@ -156,6 +156,33 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
             {loading ? <span>Signing In...</span> : <span>Sign In to Dashboard</span>}
           </button>
         </form>
+
+        {/* Dedicated Admin App Download Banner */}
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <div className="p-4 bg-gradient-to-r from-slate-900 to-brand-950 text-white rounded-2xl shadow-md border border-slate-800 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-gold-500 text-brand-950 flex items-center justify-center font-black text-xs shadow">
+                <Smartphone className="w-5 h-5 text-brand-950" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white flex items-center space-x-1.5">
+                  <span>Kaveri Admin Official App</span>
+                  <span className="text-[9px] bg-amber-400/20 text-amber-300 font-extrabold px-1.5 py-0.5 rounded uppercase">APK</span>
+                </p>
+                <p className="text-[11px] text-slate-400">1-tap admin login on phone • Never opens user screen</p>
+              </div>
+            </div>
+            <a
+              href="/KaveriAdmin.apk"
+              download="KaveriAdmin.apk"
+              className="px-3.5 py-2 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-400 hover:to-amber-400 text-brand-950 rounded-xl text-xs font-black shadow-md transition-all flex items-center space-x-1 flex-shrink-0"
+              title="Download Kaveri Admin APK"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download</span>
+            </a>
+          </div>
+        </div>
 
         <div className="mt-8 pt-4 border-t border-slate-100 text-center">
           <p className="text-[11px] text-slate-400">

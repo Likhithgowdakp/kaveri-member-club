@@ -30,9 +30,11 @@ yarn-error.log*
 
 # Android
 android_build/
+android_build_*/
 android_app/.gradle/
 android_app/build/
 android_app/app/build/
 *.apk
 !frontend/public/KaveriClub.apk
+!frontend/public/KaveriAdmin.apk
 *.aab
