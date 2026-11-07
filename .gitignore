@@ -15,8 +15,6 @@ backend/kaveri.db
 # Node / Frontend
 frontend/node_modules/
 node_modules/
-frontend/dist/
-dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

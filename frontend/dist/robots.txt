@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Allow: /#register
+Allow: /#card
+Allow: /#preferences
+Allow: /#privacy
+Disallow: /admin
+Disallow: /admin/
+
+Sitemap: https://lime-paint-winter-answering.trycloudflare.com/sitemap.xml

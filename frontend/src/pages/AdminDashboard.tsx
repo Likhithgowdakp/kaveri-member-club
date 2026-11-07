@@ -19,14 +19,19 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
   const [stats, setStats] = useState<any>(null);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const data = await api.getDashboardStats();
+      const [data, pendingRes] = await Promise.all([
+        api.getDashboardStats(),
+        api.getPendingApprovals().catch(() => ({ items: [], count: 0 })),
+      ]);
       setStats(data);
+      setPendingApprovalsCount(pendingRes?.count ?? pendingRes?.items?.length ?? 0);
     } catch (err: any) {
       setErrorMsg('Failed to load dashboard statistics.');
     } finally {
@@ -102,6 +107,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
           </button>
         </div>
       </div>
+
+      {/* Pending ₹499 Payment Approvals Banner */}
+      {pendingApprovalsCount > 0 ? (
+        <div
+          onClick={() => onNavigate('admin-members')}
+          className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-amber-500 via-amber-400 to-gold-400 text-brand-950 shadow-lg cursor-pointer hover:shadow-xl transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-amber-300"
+        >
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 rounded-2xl bg-brand-950 text-gold-400 flex items-center justify-center font-black text-xl shadow flex-shrink-0">
+              ₹
+            </div>
+            <div>
+              <p className="font-black text-base sm:text-lg text-brand-950 flex items-center space-x-2">
+                <span>{pendingApprovalsCount} Membership Payment{pendingApprovalsCount > 1 ? 's' : ''} Awaiting Approval</span>
+                <span className="text-[10px] bg-brand-950 text-gold-300 px-2 py-0.5 rounded-full font-black uppercase">Action Needed</span>
+              </p>
+              <p className="text-xs text-brand-950/80 font-semibold mt-0.5">
+                Customers have paid ₹499 and submitted transaction details. Click here to verify bank records and activate membership cards.
+              </p>
+            </div>
+          </div>
+          <button className="px-5 py-2.5 bg-brand-950 text-gold-300 hover:text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 flex-shrink-0 transition-colors">
+            <span>Verify & Approve Now</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-bold">All ₹499 membership payments are up to date!</span>
+            <span className="text-emerald-700">No pending verification requests at this moment.</span>
+          </div>
+          <button
+            onClick={() => onNavigate('admin-members')}
+            className="text-xs font-bold text-emerald-800 hover:underline flex items-center space-x-1"
+          >
+            <span>View All Members</span>
+            <ArrowRight className="w-3 h-3" />
+          </button>
+        </div>
+      )}
 
       {/* Primary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

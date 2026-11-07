@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.config import settings
 from app.database import get_db
 from app.models.admin import AdminUser
@@ -34,7 +34,8 @@ async def admin_login(
     - Also returns access token for Authorization header.
     - Flags if user must change their temporary password.
     """
-    stmt = select(AdminUser).where(AdminUser.username == login_data.username.strip())
+    uname = login_data.username.strip()
+    stmt = select(AdminUser).where(func.lower(AdminUser.username) == func.lower(uname))
     res = await db.execute(stmt)
     admin = res.scalar_one_or_none()
 

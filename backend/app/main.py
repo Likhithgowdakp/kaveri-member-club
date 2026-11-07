@@ -42,6 +42,39 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text(col_stmt))
             except Exception:
                 pass
+
+    # Ensure default owner Prabhu_Kaveri is seeded with password PrabhuSwamy@1981
+    try:
+        from sqlalchemy import select, func
+        from sqlalchemy.ext.asyncio import AsyncSession
+        from app.models.admin import AdminUser
+        from app.security.hashing import hash_password
+
+        async with AsyncSession(engine) as session:
+            admin_stmt = select(AdminUser).where(func.lower(AdminUser.username) == "prabhu_kaveri")
+            res = await session.execute(admin_stmt)
+            admin = res.scalar_one_or_none()
+            if admin:
+                admin.username = "Prabhu_Kaveri"
+                admin.password_hash = hash_password("PrabhuSwamy@1981")
+                admin.is_active = True
+                admin.must_change_password = False
+                admin.role = "owner"
+                admin.full_name = "Prabhu Swamy (Owner)"
+            else:
+                new_admin = AdminUser(
+                    username="Prabhu_Kaveri",
+                    password_hash=hash_password("PrabhuSwamy@1981"),
+                    full_name="Prabhu Swamy (Owner)",
+                    role="owner",
+                    is_active=True,
+                    must_change_password=False,
+                )
+                session.add(new_admin)
+            await session.commit()
+    except Exception as e:
+        print(f"Warning: Could not seed default admin: {e}")
+
     yield
     await engine.dispose()
 
@@ -109,7 +142,8 @@ if os.path.isdir(dist_path):
             return {"detail": "Not Found"}
 
         # Direct download for Android APKs (Customer: KaveriClub.apk, Admin: KaveriAdmin.apk)
-        if full_path in ["KaveriClub.apk", "downloads/KaveriClub.apk"]:
+        clean_path = full_path.lower().strip("/")
+        if clean_path in ["kavericlub.apk", "downloads/kavericlub.apk", "app.apk"]:
             apk_path = os.path.join(dist_path, "KaveriClub.apk")
             if not os.path.isfile(apk_path):
                 apk_path = os.path.join(os.path.dirname(dist_path), "public", "KaveriClub.apk")
@@ -117,10 +151,11 @@ if os.path.isdir(dist_path):
                 return FileResponse(
                     apk_path,
                     media_type="application/vnd.android.package-archive",
-                    filename="KaveriClub.apk"
+                    filename="KaveriClub.apk",
+                    headers={"Content-Disposition": 'attachment; filename="KaveriClub.apk"'}
                 )
 
-        if full_path in ["KaveriAdmin.apk", "downloads/KaveriAdmin.apk"]:
+        if clean_path in ["kaveriadmin.apk", "downloads/kaveriadmin.apk", "admin.apk"]:
             apk_path = os.path.join(dist_path, "KaveriAdmin.apk")
             if not os.path.isfile(apk_path):
                 apk_path = os.path.join(os.path.dirname(dist_path), "public", "KaveriAdmin.apk")
@@ -128,7 +163,8 @@ if os.path.isdir(dist_path):
                 return FileResponse(
                     apk_path,
                     media_type="application/vnd.android.package-archive",
-                    filename="KaveriAdmin.apk"
+                    filename="KaveriAdmin.apk",
+                    headers={"Content-Disposition": 'attachment; filename="KaveriAdmin.apk"'}
                 )
 
         # Serve existing static file (e.g. logo.png, favicon.png, sw.js, manifest.json)
