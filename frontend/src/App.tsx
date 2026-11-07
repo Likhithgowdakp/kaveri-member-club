@@ -6,6 +6,7 @@ import { MemberLoginPage } from './pages/MemberLoginPage';
 import { PreferencesPage } from './pages/PreferencesPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminDownloadPage } from './pages/AdminDownloadPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminMembers } from './pages/AdminMembers';
 import { AdminMemberDetail } from './pages/AdminMemberDetail';
@@ -58,10 +59,27 @@ const parseRoute = (user: any): string => {
   const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
 
   // 1. Private Admin Routes (non-advertised URL)
+  const isAdminDownload =
+    pathname === '/admin/app' ||
+    pathname === '/admin/download' ||
+    pathname === '/admin-app' ||
+    pathname === '/admin-download' ||
+    hash === 'admin/app' ||
+    hash === 'admin/download' ||
+    hash === 'admin-app' ||
+    hash === 'admin-download';
+
+  if (isAdminDownload) {
+    return 'admin-download';
+  }
+
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
   const isAdminHash = hash === 'admin' || hash.startsWith('admin/') || hash === 'admin-login';
 
   if (isAdminPath || isAdminHash) {
+    if (pathname.includes('/download') || pathname.includes('/app') || hash.includes('download') || hash.includes('app')) {
+      return 'admin-download';
+    }
     if (user) {
       if (pathname.includes('/members') || hash.includes('members')) return 'admin-members';
       if (pathname.includes('/campaigns') || hash.includes('campaigns')) return 'admin-campaigns';
@@ -261,6 +279,8 @@ export const App: React.FC = () => {
     setCurrentTab(tab);
     if (tab === 'admin-login') {
       window.history.pushState(null, '', '/admin/login');
+    } else if (tab === 'admin-download') {
+      window.history.pushState(null, '', '/admin/app');
     } else if (tab === 'admin-dashboard') {
       window.history.pushState(null, '', '/admin/dashboard');
     } else if (tab.startsWith('admin-')) {
@@ -395,6 +415,13 @@ export const App: React.FC = () => {
         )}
 
         {currentTab === 'privacy' && <PrivacyPage />}
+
+        {currentTab === 'admin-download' && (
+          <AdminDownloadPage
+            onGoToLogin={() => navigateTo('admin-login')}
+            onTriggerPwaInstall={deferredPrompt ? () => handleDownloadApp('admin') : undefined}
+          />
+        )}
 
         {currentTab === 'admin-login' && (
           <AdminLoginPage

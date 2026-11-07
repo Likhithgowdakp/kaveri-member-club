@@ -182,6 +182,12 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
               <span>Download</span>
             </a>
           </div>
+          <div className="mt-2.5 text-center">
+            <a href="/admin/app" className="text-xs text-brand-800 hover:text-brand-900 font-bold hover:underline flex items-center justify-center space-x-1">
+              <span>Looking for full app install guide? Open Kaveri Admin App Page</span>
+              <span>→</span>
+            </a>
+          </div>
         </div>
 
         <div className="mt-8 pt-4 border-t border-slate-100 text-center">
