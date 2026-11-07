@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
             except Exception:
                 pass
 
-    # Ensure default owner Prabhu_Kaveri is seeded with password PrabhuSwamy@1981
+    # Ensure default owners are seeded with active credentials (Linu_Family & Prabhu_Kaveri)
     try:
         from sqlalchemy import select, func
         from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,26 +51,52 @@ async def lifespan(app: FastAPI):
         from app.security.hashing import hash_password
 
         async with AsyncSession(engine) as session:
-            admin_stmt = select(AdminUser).where(func.lower(AdminUser.username) == "prabhu_kaveri")
+            # 1. Primary Owner: Linu_Family / Linu@1981
+            admin_stmt = select(AdminUser).where(func.lower(AdminUser.username) == "linu_family")
             res = await session.execute(admin_stmt)
             admin = res.scalar_one_or_none()
             if admin:
-                admin.username = "Prabhu_Kaveri"
-                admin.password_hash = hash_password("PrabhuSwamy@1981")
+                admin.username = "Linu_Family"
+                admin.password_hash = hash_password("Linu@1981")
                 admin.is_active = True
                 admin.must_change_password = False
                 admin.role = "owner"
-                admin.full_name = "Prabhu Swamy (Owner)"
+                admin.full_name = "Linu Family (Owner)"
             else:
                 new_admin = AdminUser(
+                    username="Linu_Family",
+                    email="linu@kavericlub.in",
+                    password_hash=hash_password("Linu@1981"),
+                    full_name="Linu Family (Owner)",
+                    role="owner",
+                    is_active=True,
+                    must_change_password=False,
+                )
+                session.add(new_admin)
+
+            # 2. Also keep Prabhu_Kaveri / PrabhuSwamy@1981 active as backup owner
+            p_stmt = select(AdminUser).where(func.lower(AdminUser.username) == "prabhu_kaveri")
+            p_res = await session.execute(p_stmt)
+            p_admin = p_res.scalar_one_or_none()
+            if p_admin:
+                p_admin.username = "Prabhu_Kaveri"
+                p_admin.password_hash = hash_password("PrabhuSwamy@1981")
+                p_admin.is_active = True
+                p_admin.must_change_password = False
+                p_admin.role = "owner"
+                p_admin.full_name = "Prabhu Swamy (Owner)"
+            else:
+                p_new = AdminUser(
                     username="Prabhu_Kaveri",
+                    email="prabhu.kaveri@kaverielectronics.in",
                     password_hash=hash_password("PrabhuSwamy@1981"),
                     full_name="Prabhu Swamy (Owner)",
                     role="owner",
                     is_active=True,
                     must_change_password=False,
                 )
-                session.add(new_admin)
+                session.add(p_new)
+
             await session.commit()
     except Exception as e:
         print(f"Warning: Could not seed default admin: {e}")

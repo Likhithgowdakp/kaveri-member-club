@@ -120,7 +120,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
                 type="text"
                 required
                 autoComplete="username"
-                placeholder="Prabhu_Kaveri"
+                placeholder="Linu_Family"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-2 focus:ring-brand-200 text-sm font-medium"
