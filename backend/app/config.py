@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     COOKIE_SAMESITE: str = "lax"
     
     # Rate Limiting
-    RATE_LIMIT_LOGIN_PER_MINUTE: int = 5
-    RATE_LIMIT_REGISTRATION_PER_MINUTE: int = 15
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = 30
+    RATE_LIMIT_REGISTRATION_PER_MINUTE: int = 30
     
     # CORS
     CORS_ORIGINS: List[str] = [
