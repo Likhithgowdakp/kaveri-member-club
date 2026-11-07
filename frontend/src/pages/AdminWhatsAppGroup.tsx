@@ -12,7 +12,29 @@ import {
   Users,
   Smartphone,
   Save,
+  Clipboard,
 } from 'lucide-react';
+
+// Sanitizer helper: Extracts clean WhatsApp group invite link from raw pasted text
+const cleanWhatsAppLink = (input: string): string => {
+  if (!input) return '';
+  let str = input.trim();
+  // If user pasted something like: "Follow this link to join my WhatsApp group: https://chat.whatsapp.com/Gz5ABC"
+  const urlMatch = str.match(/https?:\/\/[^\s]+/i);
+  if (urlMatch) {
+    return urlMatch[0];
+  }
+  if (str.toLowerCase().startsWith('chat.whatsapp.com')) {
+    return `https://${str}`;
+  }
+  if (str.toLowerCase().startsWith('whatsapp.com')) {
+    return `https://${str}`;
+  }
+  if (str && !str.startsWith('http://') && !str.startsWith('https://')) {
+    return `https://${str}`;
+  }
+  return str;
+};
 
 export const AdminWhatsAppGroup: React.FC = () => {
   const [groupUrl, setGroupUrl] = useState('https://chat.whatsapp.com/KaveriClubOfficial');
@@ -81,8 +103,9 @@ export const AdminWhatsAppGroup: React.FC = () => {
       setLoading(true);
       const data = await api.getAdminSettings();
       if (data.whatsapp_group_url) {
-        setGroupUrl(data.whatsapp_group_url);
-        generateQr(data.whatsapp_group_url);
+        const cleaned = cleanWhatsAppLink(data.whatsapp_group_url);
+        setGroupUrl(cleaned);
+        generateQr(cleaned);
       } else {
         generateQr(groupUrl);
       }
@@ -101,6 +124,27 @@ export const AdminWhatsAppGroup: React.FC = () => {
       generateQr(groupUrl);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGroupUrlChange = (value: string) => {
+    setGroupUrl(value);
+    const cleaned = cleanWhatsAppLink(value);
+    if (cleaned) {
+      generateQr(cleaned);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        const cleaned = cleanWhatsAppLink(text);
+        setGroupUrl(cleaned || text);
+        generateQr(cleaned || text);
+      }
+    } catch {
+      // Browser permissions didn't allow direct read
     }
   };
 
@@ -146,8 +190,9 @@ export const AdminWhatsAppGroup: React.FC = () => {
   };
 
   const generateQr = async (url: string) => {
+    const validUrl = cleanWhatsAppLink(url) || 'https://chat.whatsapp.com/KaveriClubOfficial';
     try {
-      const dataUrl = await QRCode.toDataURL(url, {
+      const dataUrl = await QRCode.toDataURL(validUrl, {
         width: 480,
         margin: 2,
         color: {
@@ -158,12 +203,20 @@ export const AdminWhatsAppGroup: React.FC = () => {
       setQrCodeDataUrl(dataUrl);
     } catch (e) {
       console.error('Failed to generate QR code', e);
+      try {
+        const fallback = await QRCode.toDataURL('https://chat.whatsapp.com/KaveriClubOfficial', {
+          width: 480,
+          margin: 2,
+        });
+        setQrCodeDataUrl(fallback);
+      } catch {}
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupUrl.trim()) return;
+    const finalUrl = cleanWhatsAppLink(groupUrl) || groupUrl.trim();
+    if (!finalUrl) return;
 
     setLoading(true);
     setErrorMsg(null);
@@ -171,9 +224,10 @@ export const AdminWhatsAppGroup: React.FC = () => {
 
     try {
       await api.updateAdminSettings({
-        whatsapp_group_url: groupUrl.trim(),
+        whatsapp_group_url: finalUrl,
       });
-      await generateQr(groupUrl.trim());
+      setGroupUrl(finalUrl);
+      await generateQr(finalUrl);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 4000);
     } catch (err: any) {
@@ -303,16 +357,42 @@ export const AdminWhatsAppGroup: React.FC = () => {
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  WhatsApp Group Invite Link
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    WhatsApp Group Invite Link
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handlePasteFromClipboard}
+                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition-all flex items-center space-x-1 cursor-pointer"
+                  >
+                    <Clipboard className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Paste Link</span>
+                  </button>
+                </div>
                 <div className="relative">
                   <input
-                    type="url"
+                    type="text"
                     required
-                    placeholder="https://chat.whatsapp.com/..."
+                    placeholder="Paste link: https://chat.whatsapp.com/... or chat.whatsapp.com/..."
                     value={groupUrl}
-                    onChange={(e) => setGroupUrl(e.target.value)}
+                    onChange={(e) => handleGroupUrlChange(e.target.value)}
+                    onPaste={(e) => {
+                      const text = e.clipboardData.getData('text');
+                      if (text) {
+                        e.preventDefault();
+                        const cleaned = cleanWhatsAppLink(text);
+                        setGroupUrl(cleaned);
+                        generateQr(cleaned);
+                      }
+                    }}
+                    onBlur={() => {
+                      const cleaned = cleanWhatsAppLink(groupUrl);
+                      if (cleaned && cleaned !== groupUrl) {
+                        setGroupUrl(cleaned);
+                        generateQr(cleaned);
+                      }
+                    }}
                     className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 text-xs font-mono"
                   />
                   <button
@@ -325,7 +405,7 @@ export const AdminWhatsAppGroup: React.FC = () => {
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Any customer scanning the QR code or clicking "Join Group" on their membership card will automatically join this WhatsApp group.
+                  Tip: You can paste the whole copied text from WhatsApp (e.g. "Follow this link to join my WhatsApp group: https://chat.whatsapp.com/..."). We automatically extract the group link and generate the QR code instantly!
                 </p>
               </div>
 
@@ -604,7 +684,11 @@ export const AdminWhatsAppGroup: React.FC = () => {
                   className="w-56 h-56 sm:w-64 sm:h-64 object-contain mx-auto"
                 />
               ) : (
-                <div className="w-56 h-56 sm:w-64 sm:h-64 bg-slate-100 animate-pulse rounded-xl" />
+                <div className="w-56 h-56 sm:w-64 sm:h-64 bg-white border-2 border-dashed border-emerald-300 rounded-2xl flex flex-col items-center justify-center p-4 text-center">
+                  <MessageCircle className="w-12 h-12 text-emerald-500 mb-2 animate-bounce" />
+                  <p className="text-xs font-bold text-slate-800">Generating QR Code...</p>
+                  <p className="text-[10px] text-slate-500 mt-1">Paste your WhatsApp invite link above to display instantly</p>
+                </div>
               )}
             </div>
 

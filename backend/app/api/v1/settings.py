@@ -21,6 +21,11 @@ class StoreSettingsUpdate(BaseModel):
     sms_sender_id: Optional[str] = None
     store_upi_id: Optional[str] = None
     membership_fee: Optional[int] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
 
 
 @router.get("/public")
@@ -74,31 +79,47 @@ async def get_admin_settings(
         "sms_sender_id": saved_settings.get("sms_sender_id", settings.SMS_SENDER_ID or "KAVERI"),
         "store_upi_id": saved_settings.get("store_upi_id", "7353398831-2@naviaxis"),
         "membership_fee": int(saved_settings.get("membership_fee", "499")),
+        "smtp_host": saved_settings.get("smtp_host", settings.SMTP_HOST),
+        "smtp_port": int(saved_settings.get("smtp_port", str(settings.SMTP_PORT))),
+        "smtp_user": saved_settings.get("smtp_user", settings.SMTP_USER),
+        "smtp_from_email": saved_settings.get("smtp_from_email", settings.SMTP_FROM_EMAIL),
+        "smtp_configured": bool(saved_settings.get("smtp_user") or settings.SMTP_USER),
     }
 
 
 @router.post("/admin")
 async def update_admin_settings(
     update_data: StoreSettingsUpdate,
-    current_user: AdminUser = Depends(require_role(["owner", "manager"])),
+    current_user: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin endpoint to update WhatsApp group link, SMS gateway credentials, and store preferences."""
+    """Admin endpoint to update WhatsApp group link, SMS gateway credentials, free email settings, and store preferences."""
     now = datetime.now(timezone.utc)
 
     if update_data.whatsapp_group_url is not None:
-        url = update_data.whatsapp_group_url.strip()
+        raw_url = update_data.whatsapp_group_url.strip()
+        import re
+        match = re.search(r'https?://[^\s]+', raw_url)
+        if match:
+            clean_url = match.group(0)
+        elif raw_url.lower().startswith("chat.whatsapp.com"):
+            clean_url = "https://" + raw_url
+        elif raw_url and not raw_url.startswith("http"):
+            clean_url = "https://" + raw_url
+        else:
+            clean_url = raw_url
+
         stmt = select(StoreSetting).where(StoreSetting.key == "whatsapp_group_url")
         res = await db.execute(stmt)
         setting = res.scalar_one_or_none()
         if setting:
-            setting.value = url
+            setting.value = clean_url
             setting.updated_at = now
         else:
             db.add(
                 StoreSetting(
                     key="whatsapp_group_url",
-                    value=url,
+                    value=clean_url,
                     description="Official Kaveri Member Club WhatsApp Group Invite Link",
                     updated_at=now,
                 )
@@ -213,8 +234,33 @@ async def update_admin_settings(
                 )
             )
 
+    # Optional Free Email SMTP Settings
+    for smtp_field, smtp_val in [
+        ("smtp_host", update_data.smtp_host),
+        ("smtp_port", str(update_data.smtp_port) if update_data.smtp_port is not None else None),
+        ("smtp_user", update_data.smtp_user),
+        ("smtp_password", update_data.smtp_password),
+        ("smtp_from_email", update_data.smtp_from_email),
+    ]:
+        if smtp_val is not None:
+            s_stmt = select(StoreSetting).where(StoreSetting.key == smtp_field)
+            s_res = await db.execute(s_stmt)
+            s_row = s_res.scalar_one_or_none()
+            if s_row:
+                s_row.value = smtp_val.strip()
+                s_row.updated_at = now
+            else:
+                db.add(
+                    StoreSetting(
+                        key=smtp_field,
+                        value=smtp_val.strip(),
+                        description=f"Store email configuration {smtp_field}",
+                        updated_at=now,
+                    )
+                )
+
     await db.commit()
-    return {"message": "Store, UPI payment, WhatsApp, and SMS settings saved successfully."}
+    return {"message": "Store, UPI payment, WhatsApp, SMS, and Free Email settings saved successfully."}
 
 
 class AdminTestSmsRequest(BaseModel):
@@ -225,7 +271,7 @@ class AdminTestSmsRequest(BaseModel):
 @router.post("/admin/test-sms")
 async def test_sms_gateway(
     data: AdminTestSmsRequest,
-    current_user: AdminUser = Depends(require_role(["owner", "manager"])),
+    current_user: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """

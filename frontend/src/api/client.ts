@@ -66,7 +66,7 @@ export const api = {
     body: JSON.stringify(data),
   }),
 
-  memberLogin: (data: { member_identifier: string; password: string }) =>
+  memberLogin: (data: { member_identifier: string; password: string; email?: string }) =>
     request<any>('/members/login', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -211,10 +211,10 @@ export const api = {
       body: JSON.stringify({ reason }),
     }),
 
-  sendAppSms: (memberId: number, message: string) =>
+  sendAppSms: (memberId: number, message: string, recipientEmail?: string) =>
     request<any>(`/admin/members/${memberId}/send-app-sms`, {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, recipient_email: recipientEmail }),
     }),
 
   // Campaigns

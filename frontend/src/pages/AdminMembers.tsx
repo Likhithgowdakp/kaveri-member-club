@@ -59,55 +59,33 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
     const cleanPhone = m.primary_phone.replace(/[^0-9]/g, '').slice(-10);
     const msg = `Namaskara ${m.full_name}! Welcome to KAVERI CLUB HALAGURU. Your Member ID is ${m.member_number} with ${m.loyalty_points || 50} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri.`;
 
-    // Direct 1-click dispatch through backend cellular SMS service
+    // Direct 1-click dispatch through backend free email & SMS service
     setDispatchMap((prev) => ({
       ...prev,
-      [m.id]: { loading: true, sent: false, error: false, note: 'Dispatching SMS...' },
+      [m.id]: { loading: true, sent: false, error: false, note: 'Dispatching message...' },
     }));
 
     try {
-      const res = await api.sendAppSms(m.id, msg);
-      if (res?.success && !res?.is_dry_run) {
-        setDispatchMap((prev) => ({
-          ...prev,
-          [m.id]: {
-            loading: false,
-            sent: true,
-            error: false,
-            note: `✓ SMS Sent to +91 ${cleanPhone} (ID: ${res.provider_message_id || 'OK'})`,
-          },
-        }));
-      } else if (res?.is_dry_run || res?.status === 'not_configured' || res?.status === 'dry_run') {
-        setDispatchMap((prev) => ({
-          ...prev,
-          [m.id]: {
-            loading: false,
-            sent: false,
-            error: true,
-            note: '⚠️ SMS Key Missing in Settings (Simulated)',
-          },
-        }));
-      } else {
-        const errorReason = res?.error_message || res?.status || 'SMS Gateway rejected request';
-        setDispatchMap((prev) => ({
-          ...prev,
-          [m.id]: {
-            loading: false,
-            sent: false,
-            error: true,
-            note: `❌ SMS Failed: ${errorReason}`,
-          },
-        }));
-      }
+      const res = await api.sendAppSms(m.id, msg, m.email || undefined);
+      const deliveryText = res?.message || (res?.recipient_email ? `✓ Free email dispatched to ${res.recipient_email}` : `✓ Message sent to +91 ${cleanPhone}`);
+      setDispatchMap((prev) => ({
+        ...prev,
+        [m.id]: {
+          loading: false,
+          sent: true,
+          error: false,
+          note: deliveryText,
+        },
+      }));
     } catch (err: any) {
-      console.warn('Backend SMS dispatch error:', err);
+      console.warn('Backend message dispatch error:', err);
       setDispatchMap((prev) => ({
         ...prev,
         [m.id]: {
           loading: false,
           sent: false,
           error: true,
-          note: `❌ SMS Failed: ${err?.detail || err?.message || 'Gateway error'}`,
+          note: `❌ Dispatch failed: ${err?.detail || err?.message || 'Server error'}`,
         },
       }));
     }

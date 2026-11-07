@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api, ApiError } from '../api/client';
-import { UserCheck, ArrowRight, Key, Award, CheckCircle2, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react';
+import { UserCheck, ArrowRight, Key, Award, CheckCircle2, AlertCircle, Lock, Eye, EyeOff, Mail } from 'lucide-react';
 
 interface MemberLoginPageProps {
   onLoginSuccess: (memberData: any) => void;
@@ -15,6 +15,7 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
 }) => {
   const [memberIdentifier, setMemberIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
       const data = await api.memberLogin({
         member_identifier: memberIdentifier.trim(),
         password: password,
+        email: email.trim() || undefined,
       });
       // Save session
       localStorage.setItem('kaveri_member_session', JSON.stringify(data));
@@ -136,6 +138,28 @@ export const MemberLoginPage: React.FC<MemberLoginPageProps> = ({
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center space-x-1.5">
+                <Mail className="w-3.5 h-3.5 text-brand-700" />
+                <span>Email Address (Optional)</span>
+              </span>
+              <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                Free App SMS & Digital Bills
+              </span>
+            </label>
+            <input
+              type="email"
+              placeholder="e.g. yourname@gmail.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-2 focus:ring-brand-200 text-sm tracking-wide font-medium"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Provide your email to receive free digital receipts, festival discounts, and App SMS freely!
+            </p>
           </div>
 
           <button

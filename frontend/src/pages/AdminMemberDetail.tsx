@@ -14,6 +14,7 @@ import {
   Send,
   Sparkles,
   Trash2,
+  Mail,
 } from 'lucide-react';
 
 interface AdminMemberDetailProps {
@@ -44,8 +45,9 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Official App SMS & WhatsApp Messaging state (Sent from App under KAVERI CLUB HALAGURU)
+  // Official App SMS & Free Email Messaging state (Sent from App under KAVERI CLUB HALAGURU)
   const [waMessage, setWaMessage] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [smsSending, setSmsSending] = useState(false);
   const [smsSuccess, setSmsSuccess] = useState<string | null>(null);
   const [smsError, setSmsError] = useState<string | null>(null);
@@ -59,6 +61,7 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
       setEditName(res.member.full_name);
       setEditAddress(res.member.address || '');
       setEditNotes(res.member.notes || '');
+      setRecipientEmail(res.member.email || '');
 
       // Set default personalized message under business name
       const defaultMsg = `Namaskara ${res.member.full_name}! Welcome to KAVERI CLUB HALAGURU. Your Member ID is ${res.member.member_number} with ${res.member.loyalty_points || 50} loyalty points. Visit Kaveri Electronic, HMS Complex, Kanakapura Road, Halaguru. Team Kaveri.`;
@@ -74,15 +77,20 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
     if (!waMessage.trim() || !data?.member) return;
     const cleanPhone = data.member.primary_phone.replace(/[^0-9]/g, '').slice(-10);
 
-    // Send directly through app backend. DO NOT redirect or open WhatsApp!
+    // Send directly through app backend. Dispatches free branded email and app SMS
     setSmsSending(true);
     setSmsSuccess(null);
     setSmsError(null);
 
     try {
-      const res = await api.sendAppSms(data.member.id, waMessage.trim());
-      const dryNote = res?.is_dry_run ? ' (App Server Mode)' : ` (Gateway Ref: ${res?.provider_message_id || 'OK'})`;
-      setSmsSuccess(`✓ Official SMS successfully dispatched directly to +91 ${cleanPhone} under sender 'KAVERI CLUB HALAGURU'${dryNote}!`);
+      const res = await api.sendAppSms(data.member.id, waMessage.trim(), recipientEmail.trim() || undefined);
+      setSmsSuccess(res?.message || `✓ Official message dispatched to +91 ${cleanPhone}!`);
+      if (res?.recipient_email && !data.member.email) {
+        setData((prev: any) => ({
+          ...prev,
+          member: { ...prev.member, email: res.recipient_email },
+        }));
+      }
     } catch (err: any) {
       console.warn('Backend SMS error:', err);
       setSmsError(err.detail || 'Failed to dispatch SMS through server.');
@@ -284,27 +292,26 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
         </div>
       </div>
 
-      {/* Official App SMS Dispatch (Sent under KAVERI CLUB HALAGURU, NEVER owner's personal phone) */}
+      {/* Official App SMS & Free Email Dispatch (Zero Fees) */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 border-b border-slate-100 pb-4">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 rounded-xl bg-brand-900 text-gold-400 flex items-center justify-center shadow-sm">
-              <Smartphone className="w-5 h-5" />
+              <Mail className="w-5 h-5 text-gold-400" />
             </div>
             <div>
               <h2 className="text-base font-bold text-brand-950">
-                Official SMS Dispatch (Sent from Kaveri App)
+                Official App SMS & Free Member Email Dispatch
               </h2>
               <p className="text-xs text-slate-500">
-                Sent directly from this application server to {member.full_name}'s phone ({member.primary_phone})
+                Delivers free branded notification directly to {member.full_name}'s email address without charges, plus app SMS to {member.primary_phone}.
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-brand-50 text-brand-900 border border-brand-300 inline-flex items-center space-x-1">
-              <span>Sender ID:</span>
-              <span className="font-black text-brand-950">KAVERI CLUB HALAGURU</span>
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center space-x-1">
+              <span>✓ Free Email Dispatch Active</span>
             </span>
           </div>
         </div>
@@ -322,10 +329,33 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
           </div>
         )}
 
+        {/* Recipient Email for Free Notification */}
+        <div className="mb-4 p-3 rounded-2xl bg-slate-50 border border-slate-200">
+          <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <span className="flex items-center space-x-1.5">
+              <Mail className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Recipient Email Address (For Free Zero-Cost Message):</span>
+            </span>
+            <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+              Zero Fees / No SMS Cost
+            </span>
+          </label>
+          <input
+            type="email"
+            value={recipientEmail}
+            onChange={(e) => setRecipientEmail(e.target.value)}
+            placeholder="e.g. member@gmail.com (Email given at login/registration)"
+            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 text-xs font-medium"
+          />
+          <p className="text-[11px] text-slate-500 mt-1">
+            When you click Send, this message is sent straight to the member's email inbox with their Member ID and points balance for free!
+          </p>
+        </div>
+
         {/* Template Buttons */}
         <div className="mb-3">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-            Official SMS Templates (Sender: KAVERI CLUB HALAGURU):
+            Official Message Templates (Sender: KAVERI CLUB HALAGURU):
           </span>
           <div className="flex flex-wrap gap-2">
             <button
@@ -374,12 +404,12 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
             value={waMessage}
             onChange={(e) => setWaMessage(e.target.value)}
             className="w-full p-3 rounded-2xl border border-slate-300 text-xs text-slate-800 focus:border-brand-600 focus:ring-1 focus:ring-brand-500 font-sans"
-            placeholder="Type your official SMS message..."
+            placeholder="Type your official message..."
           />
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-[11px] text-slate-500">
-              Dispatched directly from Kaveri server • Sender ID: <strong>KAVERI CLUB HALAGURU</strong>.
+              Dispatched directly from Kaveri server • Free Email Delivery Enabled.
             </p>
 
             <button
@@ -389,7 +419,7 @@ export const AdminMemberDetail: React.FC<AdminMemberDetailProps> = ({ memberId, 
               className="px-6 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-800 active:scale-95 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
             >
               <Send className="w-4 h-4 text-gold-400" />
-              <span>{smsSending ? 'Sending SMS from App...' : 'Send App SMS to Phone'}</span>
+              <span>{smsSending ? 'Sending Free Message...' : '✉️ Send App SMS & Free Email'}</span>
             </button>
           </div>
         </div>

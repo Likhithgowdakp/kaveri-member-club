@@ -20,6 +20,7 @@ from app.services.messaging.sms import (
     dispatch_payment_rejected_sms,
     dispatch_card_link_sms,
 )
+from app.services.messaging.email_service import send_free_member_email
 from app.services.messaging import whatsapp_provider
 from app.services.member_service import washout_member_data
 from app.api.deps import log_admin_action
@@ -158,6 +159,27 @@ async def approve_member_payment(
         member_number=member.member_number,
         card_url=card_url,
     )
+
+    # Free email delivery if member has an email on file
+    email_note = ""
+    if member.email and "@" in member.email:
+        welcome_email_text = (
+            f"Congratulations {member.full_name}! Your ₹499 membership payment has been verified and approved.\n\n"
+            f"Your Kaveri Member Club luxury digital card ({member.member_number}) is now ACTIVE with {member.loyalty_points or 50} reward points.\n\n"
+            f"Access your card anytime at {card_url}.\n\n"
+            f"Visit Kaveri Electronic at HMS Complex, Kanakapura Main Road, Halaguru Hobli for exclusive discounts!"
+        )
+        e_res = await send_free_member_email(
+            recipient_email=member.email,
+            recipient_name=member.full_name,
+            subject=f"★ Membership Activated! Kaveri Member Club ({member.member_number})",
+            message_text=welcome_email_text,
+            member_number=member.member_number,
+            points=member.loyalty_points,
+            card_url=card_url,
+        )
+        if e_res.success:
+            email_note = f" Free email confirmation sent to {member.email}."
 
     await log_admin_action(
         db,
@@ -412,6 +434,7 @@ async def adjust_loyalty_points(
 
 class SendAppSmsRequest(BaseModel):
     message: str
+    recipient_email: Optional[str] = None
 
 
 @router.post("/{member_id}/send-app-sms")
@@ -423,8 +446,9 @@ async def send_app_sms_to_member(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Sends an official SMS to the customer directly from the app backend,
-    under the business sender name 'KAVERI CLUB HALAGURU'.
+    Sends an official message to the customer directly from the app backend:
+    - Free Email Notification: Dispatched directly to the member's email address freely without any fees.
+    - Cellular SMS: Also attempts cellular SMS via configured gateway.
     Never uses or exposes the owner's personal phone number!
     """
     stmt = select(Member).where(Member.id == member_id)
@@ -435,22 +459,62 @@ async def send_app_sms_to_member(
 
     clean_phone = "".join(filter(str.isdigit, member.primary_phone))[-10:]
 
-    # Check store_settings table for dynamic SMS configuration
-    stmt_key = select(StoreSetting).where(StoreSetting.key == "sms_api_key")
-    res_key = await db.execute(stmt_key)
-    row_key = res_key.scalar_one_or_none()
-    active_sms_key = row_key.value if row_key and row_key.value else None
+    # Resolve recipient email (from request or member record)
+    target_email = (data.recipient_email or member.email or "").strip().lower()
+    if data.recipient_email and data.recipient_email.strip() and not member.email:
+        member.email = data.recipient_email.strip().lower()
+        await db.commit()
+        await db.refresh(member)
 
-    stmt_sender = select(StoreSetting).where(StoreSetting.key == "sms_sender_id")
-    res_sender = await db.execute(stmt_sender)
-    row_sender = res_sender.scalar_one_or_none()
-    active_sender = row_sender.value if row_sender and row_sender.value else None
+    # Check store_settings table for dynamic SMS and SMTP configuration
+    stmt_settings = select(StoreSetting)
+    res_settings = await db.execute(stmt_settings)
+    store_map = {s.key: s.value for s in res_settings.scalars().all()}
 
+    active_sms_key = store_map.get("sms_api_key")
+    active_sender = store_map.get("sms_sender_id")
+    card_url = f"{settings.BUSINESS_PUBLIC_URL}/card"
+
+    # 1. Zero-fee email dispatch directly to the user's email
+    email_res = None
+    email_delivered = False
+    if target_email and "@" in target_email:
+        email_res = await send_free_member_email(
+            recipient_email=target_email,
+            recipient_name=member.full_name,
+            subject=f"Kaveri Member Club - Update ({member.member_number})",
+            message_text=data.message,
+            member_number=member.member_number,
+            points=member.loyalty_points,
+            card_url=card_url,
+            smtp_settings=store_map,
+        )
+        email_delivered = email_res.success
+
+    # 2. Cellular SMS dispatch
     sms_provider = DLTSmsProvider(api_key=active_sms_key, sender_id=active_sender)
     result = await sms_provider.send_message(
         recipient_phone=clean_phone,
         message_text=data.message,
     )
+
+    # Overall success: True if email succeeded freely OR SMS succeeded
+    overall_success = email_delivered or result.success
+
+    delivery_notes = []
+    if email_delivered:
+        delivery_notes.append(f"✓ Free email delivered to {target_email} (Zero cost)")
+    elif target_email:
+        delivery_notes.append(f"Email note: {email_res.error_message if email_res else 'Failed'}")
+    else:
+        delivery_notes.append("No customer email on file (Add email in member profile for free delivery)")
+
+    if result.success:
+        delivery_notes.append(f"Cellular SMS sent to +91{clean_phone}")
+    else:
+        delivery_notes.append(f"SMS: {result.status or result.error_message}")
+
+    summary_msg = " • ".join(delivery_notes)
 
     await log_admin_action(
         db,
@@ -458,23 +522,27 @@ async def send_app_sms_to_member(
         "SEND_APP_SMS",
         "member",
         str(member.id),
-        f"Sent App SMS to +91{clean_phone} under KAVERI CLUB HALAGURU (Status: {result.status}, DryRun: {result.is_dry_run}): {data.message[:60]}...",
+        f"Message dispatched for {member.member_number} ({member.full_name}). Email: {target_email or 'None'} (Sent: {email_delivered}), SMS: +91{clean_phone} (Status: {result.status}): {data.message[:60]}...",
         get_client_ip(request),
     )
 
     return {
-        "success": result.success,
-        "status": result.status,
-        "is_dry_run": result.is_dry_run,
-        "provider_message_id": result.provider_message_id,
+        "success": overall_success,
+        "status": "delivered_free" if email_delivered else result.status,
+        "is_dry_run": result.is_dry_run and not email_delivered,
+        "email_sent": email_delivered,
+        "recipient_email": target_email or None,
+        "provider_message_id": (email_res.provider_message_id if email_res else None) or result.provider_message_id,
         "sender": "KAVERI CLUB HALAGURU",
         "recipient": f"+91{clean_phone}",
         "clean_phone": clean_phone,
-        "error_message": result.error_message,
-        "details": result.details,
-        "message": f"Dispatched SMS to +91{clean_phone} under 'KAVERI CLUB HALAGURU'."
-        if result.success
-        else f"SMS dispatch failed: {result.error_message}",
+        "error_message": None if overall_success else result.error_message,
+        "details": {
+            "email_status": email_res.status if email_res else "no_email",
+            "sms_status": result.status,
+            "target_email": target_email,
+        },
+        "message": summary_msg,
     }
 
 

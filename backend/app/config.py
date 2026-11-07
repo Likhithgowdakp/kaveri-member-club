@@ -44,7 +44,15 @@ class Settings(BaseSettings):
     REGISTRATION_BONUS_POINTS: int = 50
     DEFAULT_STORE_UPI_ID: str = "7353398831-2@naviaxis"
     MEMBERSHIP_FEE: int = 499
-    BUSINESS_PUBLIC_URL: str = "https://humans-knew-calendars-treasure.trycloudflare.com"
+    BUSINESS_PUBLIC_URL: str = "https://kaveri-member-club-alje.onrender.com"
+    
+    # Free Email Service (Zero Cost Delivery)
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "mathrushreemep@gmail.com"
+    SMTP_ENABLED: bool = True
     
     # WhatsApp Cloud API
     WHATSAPP_ENABLED: bool = False

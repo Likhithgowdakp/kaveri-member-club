@@ -179,8 +179,9 @@ class MemberVerifyRequest(BaseModel):
 
 
 class MemberLoginRequest(BaseModel):
-    member_identifier: str = Field(..., min_length=2, description="Member ID (e.g. KAV-000001) or registered mobile number")
+    member_identifier: str = Field(..., min_length=2, description="Member ID (e.g. KAV-000001), registered mobile number, or email")
     password: str = Field(..., min_length=1, description="Account password")
+    email: Optional[EmailStr] = Field(None, description="Optional email address to attach or update on member account")
 
 
 class MemberUpdateRequest(BaseModel):

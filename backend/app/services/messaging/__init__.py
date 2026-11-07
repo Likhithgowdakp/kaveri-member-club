@@ -1,6 +1,7 @@
 from app.services.messaging.base import BaseMessagingProvider, SendResult
 from app.services.messaging.whatsapp import WhatsAppCloudProvider
 from app.services.messaging.sms import DLTSmsProvider
+from app.services.messaging.email_service import send_free_member_email
 
 whatsapp_provider = WhatsAppCloudProvider()
 sms_provider = DLTSmsProvider()
@@ -19,6 +20,7 @@ __all__ = [
     "SendResult",
     "WhatsAppCloudProvider",
     "DLTSmsProvider",
+    "send_free_member_email",
     "whatsapp_provider",
     "sms_provider",
     "get_messaging_provider",

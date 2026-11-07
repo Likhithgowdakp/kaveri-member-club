@@ -19,6 +19,7 @@ from app.services.consent_service import get_all_consents_for_member
 from app.services.member_service import register_member
 from app.models.setting import StoreSetting
 from app.services.messaging.sms import DLTSmsProvider, dispatch_payment_submitted_sms
+from app.services.messaging.email_service import send_free_member_email
 from app.security.hashing import verify_password
 from app.security.rate_limiter import rate_limit, get_client_ip
 
@@ -81,6 +82,19 @@ async def register_new_member(
         recipient_phone=member.primary_phone,
         message_text=sms_text,
     )
+
+    # Free email delivery if member registered with email
+    if member.email and "@" in member.email:
+        card_url = f"{settings.BUSINESS_PUBLIC_URL}/card"
+        await send_free_member_email(
+            recipient_email=member.email,
+            recipient_name=member.full_name,
+            subject=f"Welcome to Kaveri Member Club ({member.member_number})",
+            message_text=welcome_msg,
+            member_number=member.member_number,
+            points=member.loyalty_points,
+            card_url=card_url,
+        )
 
     return MemberRegistrationResult(
         member=MemberResponse.model_validate(member),
@@ -283,6 +297,11 @@ async def member_login_with_password(
     else:
         conditions.append(Member.primary_phone == identifier_clean)
 
+    # Also support logging in directly with registered Email Address
+    raw_ident = login_data.member_identifier.strip().lower()
+    if "@" in raw_ident:
+        conditions.append(func.lower(Member.email) == raw_ident)
+
     stmt = select(Member).where(or_(*conditions))
     res = await db.execute(stmt)
     member = res.scalar_one_or_none()
@@ -320,6 +339,14 @@ async def member_login_with_password(
                 detail="Invalid Member ID or Password. Please check your credentials.",
             )
 
+    # If customer provided email during login, attach or update it on their account
+    if getattr(login_data, "email", None):
+        clean_email = str(login_data.email).strip().lower()
+        if member.email != clean_email:
+            member.email = clean_email
+            await db.commit()
+            await db.refresh(member)
+
     # Dispatch access notification SMS to the member's registered phone
     login_sms = (
         f"Namaskara {member.full_name}! You have successfully logged into KAVERI CLUB HALAGURU. "
@@ -331,6 +358,26 @@ async def member_login_with_password(
         recipient_phone=member.primary_phone,
         message_text=login_sms,
     )
+
+    # Free email delivery if member has an email on file
+    if member.email and "@" in member.email:
+        card_url = f"{settings.BUSINESS_PUBLIC_URL}/card"
+        login_email_body = (
+            f"You have successfully signed in to KAVERI CLUB HALAGURU.\n\n"
+            f"Member ID: {member.member_number}\n"
+            f"Reward Points: {member.loyalty_points} points\n\n"
+            f"View your digital membership card anytime at {card_url}.\n"
+            f"Visit Kaveri Electronic at HMS Complex, Kanakapura Main Road, Halaguru Hobli for special festival deals!"
+        )
+        await send_free_member_email(
+            recipient_email=member.email,
+            recipient_name=member.full_name,
+            subject=f"Kaveri Member Club - Login Confirmed ({member.member_number})",
+            message_text=login_email_body,
+            member_number=member.member_number,
+            points=member.loyalty_points,
+            card_url=card_url,
+        )
 
     consents = await get_all_consents_for_member(db, member.id)
 
