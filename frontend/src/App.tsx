@@ -217,22 +217,33 @@ export const App: React.FC = () => {
         }
       }
 
-      // 2. Admin session: verify with backend /auth/me
+      // 2. Admin session: retain stored session, verify asynchronously with backend /auth/me
       const token = localStorage.getItem('kaveri_admin_token');
       const storedUser = localStorage.getItem('kaveri_admin_user');
       let verifiedAdmin = null;
 
       if (token && storedUser) {
         try {
+          verifiedAdmin = JSON.parse(storedUser);
+          setAdminUser(verifiedAdmin);
+        } catch {
+          localStorage.removeItem('kaveri_admin_user');
+        }
+
+        try {
           const profile = await api.getAdminProfile();
           verifiedAdmin = profile;
           setAdminUser(profile);
           localStorage.setItem('kaveri_admin_user', JSON.stringify(profile));
-        } catch {
-          // Token invalid, expired, or manipulated
-          localStorage.removeItem('kaveri_admin_token');
-          localStorage.removeItem('kaveri_admin_user');
-          setAdminUser(null);
+        } catch (err: any) {
+          // ONLY clear session if server explicitly returned 401 Unauthorized
+          if (err && err.status === 401) {
+            localStorage.removeItem('kaveri_admin_token');
+            localStorage.removeItem('kaveri_admin_user');
+            setAdminUser(null);
+            verifiedAdmin = null;
+          }
+          // If server is waking up or network blip, keep the authenticated user active!
         }
       }
 

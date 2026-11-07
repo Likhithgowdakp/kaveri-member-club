@@ -72,7 +72,11 @@ def build_single_apk(app_name: str, package_name: str, target_url: str, output_f
     java_code = f"""package {package_name};
 
 import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -82,11 +86,53 @@ import android.view.Window;
 public class MainActivity extends Activity {{
     private WebView webView;
     private static final String APP_URL = "{target_url}";
+    public ValueCallback<Uri[]> uploadMessageAboveL;
+    public static final int FILE_CHOOSER_RESULT_CODE = 10001;
 
     public static class AppWebViewClient extends WebViewClient {{
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {{
             view.loadUrl(url);
+            return true;
+        }}
+
+        @Override
+        public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {{
+            String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'/><style>"
+                + "body{{background:#020617;color:#f8fafc;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;padding:24px;box-sizing:border-box;text-align:center;}}"
+                + "h2{{color:#f59e0b;font-size:22px;margin:0 0 8px;font-weight:900;}}"
+                + "p{{color:#94a3b8;font-size:13px;line-height:1.6;margin:0 0 24px;}}"
+                + "button{{padding:14px 28px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#020617;border:none;border-radius:14px;font-weight:900;font-size:14px;cursor:pointer;}}"
+                + "</style></head><body>"
+                + "<h2>Kaveri Club Halaguru</h2>"
+                + "<p>Connecting to secure server... If the server was sleeping, please wait a few seconds and tap Refresh.</p>"
+                + "<button onclick='location.reload()'>↻ Refresh / ಮರುಲೋಡ್</button>"
+                + "</body></html>";
+            view.loadDataWithBaseURL(null, html, "text/html", "utf-8", null);
+        }}
+    }}
+
+    public static class AppWebChromeClient extends WebChromeClient {{
+        private final MainActivity activity;
+        public AppWebChromeClient(MainActivity activity) {{
+            this.activity = activity;
+        }}
+        @Override
+        public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {{
+            if (activity.uploadMessageAboveL != null) {{
+                activity.uploadMessageAboveL.onReceiveValue(null);
+                activity.uploadMessageAboveL = null;
+            }}
+            activity.uploadMessageAboveL = filePathCallback;
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("image/*");
+            try {{
+                activity.startActivityForResult(Intent.createChooser(intent, "Select Payment Proof"), FILE_CHOOSER_RESULT_CODE);
+            }} catch (Exception e) {{
+                activity.uploadMessageAboveL = null;
+                return false;
+            }}
             return true;
         }}
     }}
@@ -112,7 +158,26 @@ public class MainActivity extends Activity {{
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
         webView.setWebViewClient(new AppWebViewClient());
+        webView.setWebChromeClient(new AppWebChromeClient(this));
         webView.loadUrl(APP_URL);
+    }}
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {{
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FILE_CHOOSER_RESULT_CODE) {{
+            if (uploadMessageAboveL != null) {{
+                Uri[] results = null;
+                if (resultCode == Activity.RESULT_OK && data != null) {{
+                    String dataString = data.getDataString();
+                    if (dataString != null) {{
+                        results = new Uri[]{{Uri.parse(dataString)}};
+                    }}
+                }}
+                uploadMessageAboveL.onReceiveValue(results);
+                uploadMessageAboveL = null;
+            }}
+        }}
     }}
 
     @Override

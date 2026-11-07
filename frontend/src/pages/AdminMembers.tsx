@@ -154,27 +154,19 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
     fetchPendingApprovals();
   }, [page, statusFilter]);
 
-  const promptApprovePayment = (m: any) => {
-    setMemberToApprove(m);
-    setVerifiedWithBankStatement(false);
-  };
-
-  const handleConfirmApprovePayment = async () => {
-    if (!memberToApprove) return;
-    if (!verifiedWithBankStatement) {
-      alert("You must verify the payment against bank / UPI statement for 7353398831-2@naviaxis before approving.");
-      return;
-    }
-    const m = memberToApprove;
+  const handleApprovePaymentDirect = async (m: any) => {
+    if (!m) return;
     setApprovingMap((prev) => ({ ...prev, [m.id]: true }));
     try {
       await api.approveMemberPayment(m.id, { verified_with_bank_statement: true });
       setApprovalNotice(
-        `✓ Approved ₹${m.payment_amount || 499} payment for ${m.full_name} (${m.member_number})! Membership card unlocked and official welcome SMS dispatched.`
+        `✓ Successfully approved ₹${m.payment_amount || 499} payment for ${m.full_name} (${m.member_number})! Membership card unlocked and official Welcome SMS dispatched.`
       );
-      setMemberToApprove(null);
       if (selectedProofMember?.id === m.id) {
         setSelectedProofMember(null);
+      }
+      if (memberToApprove?.id === m.id) {
+        setMemberToApprove(null);
       }
       await fetchPendingApprovals();
       await fetchMembers();
@@ -184,6 +176,11 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
     } finally {
       setApprovingMap((prev) => ({ ...prev, [m.id]: false }));
     }
+  };
+
+  const handleConfirmApprovePayment = async () => {
+    if (!memberToApprove) return;
+    await handleApprovePaymentDirect(memberToApprove);
   };
 
   const handleRejectPayment = async () => {
@@ -257,20 +254,20 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
       )}
 
       {/* Header & Tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-black text-brand-950">Members Directory & Approvals</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-brand-950">Members Directory & Approvals</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Manage registrations, verify ₹499 membership payments, and dispatch member SMS
           </p>
         </div>
 
         {/* Tab switchers */}
-        <div className="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200 self-start sm:self-auto">
+        <div className="w-full sm:w-auto grid grid-cols-2 sm:flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200">
           <button
             type="button"
             onClick={() => setActiveTab('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
               activeTab === 'all'
                 ? 'bg-white text-brand-950 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -281,7 +278,7 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
           <button
             type="button"
             onClick={() => setActiveTab('pending')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer text-center ${
               activeTab === 'pending'
                 ? 'bg-brand-900 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -289,7 +286,7 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
           >
             <span>₹499 Approvals</span>
             {pendingCount > 0 ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-amber-950 animate-pulse">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-400 text-amber-950 animate-pulse">
                 {pendingCount} new
               </span>
             ) : (
@@ -409,7 +406,7 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
                     <button
                       type="button"
                       disabled={approvingMap[m.id]}
-                      onClick={() => promptApprovePayment(m)}
+                      onClick={() => handleApprovePaymentDirect(m)}
                       className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-4 h-4 text-emerald-200" />
@@ -710,7 +707,7 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
                 <button
                   type="button"
                   disabled={approvingMap[selectedProofMember.id]}
-                  onClick={() => promptApprovePayment(selectedProofMember)}
+                  onClick={() => handleApprovePaymentDirect(selectedProofMember)}
                   className="px-5 py-2 rounded-xl text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/30 flex items-center space-x-2 cursor-pointer disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-4 h-4 text-emerald-200" />
@@ -807,7 +804,7 @@ export const AdminMembers: React.FC<AdminMembersProps> = ({ onSelectMember }) =>
               </button>
               <button
                 type="button"
-                disabled={!verifiedWithBankStatement || approvingMap[memberToApprove.id]}
+                disabled={approvingMap[memberToApprove.id]}
                 onClick={handleConfirmApprovePayment}
                 className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center space-x-2 cursor-pointer transition-all"
               >

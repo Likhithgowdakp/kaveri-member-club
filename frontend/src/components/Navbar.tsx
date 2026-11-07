@@ -29,19 +29,37 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="bg-brand-900 text-white shadow-lg sticky top-0 z-40 border-b border-brand-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo & Store Identity */}
           <div
-            className="flex items-center space-x-3 cursor-pointer group"
+            className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group flex-shrink-0"
             onClick={() => handleNav(isAdminLoggedIn ? 'admin-dashboard' : 'register')}
           >
             <img
               src="/logo.png"
               alt="Kaveri Electronic Halaguru"
-              className="w-12 h-12 object-contain rounded-xl shadow-md border border-gold-400/40 bg-slate-900/60 p-0.5 group-hover:scale-105 transition-transform"
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-xl shadow-md border border-gold-400/40 bg-slate-900/80 p-0.5 group-hover:scale-105 transition-transform"
             />
-            <div>
+            {/* Mobile View Title: Compact, elegant, perfectly aligned */}
+            <div className="sm:hidden flex flex-col justify-center">
+              <div className="flex items-center space-x-1.5">
+                <span className="text-sm font-black tracking-tight text-white leading-tight">
+                  KAVERI CLUB
+                </span>
+                <span className="text-[9px] uppercase px-1.5 py-0.2 rounded font-black bg-gold-500/25 text-gold-300 border border-gold-400/30">
+                  HALAGURU
+                </span>
+              </div>
+              <p className="text-[10px] text-brand-200 tracking-tight font-medium flex items-center space-x-1 mt-0.5">
+                <span className="text-gold-400 font-bold">{isAdminLoggedIn ? 'Admin Portal' : 'Member Club'}</span>
+                <span>•</span>
+                <span className="truncate max-w-[110px]">Kanakapura Rd</span>
+              </p>
+            </div>
+
+            {/* Desktop / Tablet View Title: Full Lavish Title */}
+            <div className="hidden sm:block">
               <div className="flex items-center space-x-2">
                 <span className="text-xl font-extrabold tracking-tight text-white group-hover:text-gold-300 transition-colors">
                   KAVERI ELECTRONIC
@@ -254,7 +272,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           {/* Mobile actions & menu button */}
-          <div className="md:hidden flex items-center space-x-2">
+          <div className="md:hidden flex items-center space-x-1.5 flex-shrink-0">
             {onOpenDownloadApp && (
               isAdminLoggedIn || currentTab.startsWith('admin-') ? (
                 <a
@@ -265,7 +283,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       onOpenDownloadApp('admin');
                     }
                   }}
-                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-gold-400 text-brand-950 font-black text-xs shadow flex items-center space-x-1 border border-amber-300 active:scale-95 cursor-pointer"
+                  className="px-2 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-gold-400 text-brand-950 font-black text-[11px] shadow flex items-center space-x-1 border border-amber-300 active:scale-95 cursor-pointer"
                   title="Download Kaveri Admin App (KaveriAdmin.apk)"
                 >
                   <Smartphone className="w-3.5 h-3.5" />
@@ -280,7 +298,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       onOpenDownloadApp('customer');
                     }
                   }}
-                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-gold-500 to-amber-500 text-brand-950 font-black text-xs shadow flex items-center space-x-1 border border-gold-300 active:scale-95 cursor-pointer"
+                  className="px-2 py-1 rounded-lg bg-gradient-to-r from-gold-500 to-amber-500 text-brand-950 font-black text-[11px] shadow flex items-center space-x-1 border border-gold-300 active:scale-95 cursor-pointer"
                   title="Download Kaveri Club App (KaveriClub.apk)"
                 >
                   <Smartphone className="w-3.5 h-3.5" />
@@ -290,7 +308,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-brand-200 hover:text-white hover:bg-brand-800"
+              className="p-1.5 rounded-lg text-brand-200 hover:text-white hover:bg-brand-800 focus:outline-none"
               aria-label="Toggle navigation menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

@@ -88,27 +88,29 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegistrationSucces
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
       {/* Brand Header Banner with Official 3D Logo */}
-      <div className="text-center mb-8">
-        <div className="inline-block relative mb-4">
+      <div className="text-center mb-6 sm:mb-8 px-2">
+        <div className="inline-block relative mb-3 sm:mb-4">
           <img
             src="/logo.png"
             alt="Kaveri Electronic Halaguru"
-            className="w-24 h-24 sm:w-28 sm:h-28 object-contain rounded-2xl shadow-2xl border-2 border-gold-400/50 bg-slate-900/60 p-1 mx-auto"
+            className="w-20 h-20 sm:w-28 sm:h-28 object-contain rounded-2xl shadow-2xl border-2 border-gold-400/50 bg-slate-900/80 p-1 mx-auto"
           />
         </div>
-        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-gold-100 text-gold-900 border border-gold-300 text-xs font-bold mb-3 shadow-sm">
-          <Sparkles className="w-3.5 h-3.5 text-gold-700" />
-          <span>Official Membership Club • 50 Welcome Reward Points</span>
+        <div>
+          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-gold-100 text-gold-900 border border-gold-300 text-[11px] sm:text-xs font-bold mb-2.5 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-gold-700 flex-shrink-0" />
+            <span>Official Membership Club • 50 Welcome Points</span>
+          </div>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-brand-950 tracking-tight">
+        <h1 className="text-2xl sm:text-4xl font-black text-brand-950 tracking-tight">
           Join Kaveri Member Club
         </h1>
-        <p className="mt-2 text-sm sm:text-base text-slate-600 font-medium">
+        <p className="mt-1.5 text-xs sm:text-base text-slate-600 font-medium max-w-lg mx-auto">
           Kaveri Electronic Halaguru • Your Trusted Home Appliances & Electronics Store
         </p>
-        <div className="flex items-center justify-center space-x-1 text-xs text-slate-500 mt-1">
-          <MapPin className="w-3.5 h-3.5 text-brand-700" />
-          <span>HMS Complex, Kanakapura Main Road, Halaguru Hobli, Karnataka</span>
+        <div className="flex items-center justify-center space-x-1 text-[11px] sm:text-xs text-slate-500 mt-1">
+          <MapPin className="w-3.5 h-3.5 text-brand-700 flex-shrink-0" />
+          <span className="truncate max-w-[280px] sm:max-w-none">HMS Complex, Kanakapura Main Rd, Halaguru Hobli</span>
         </div>
       </div>
 

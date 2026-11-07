@@ -35,4 +35,6 @@ android_app/app/build/
 *.apk
 !frontend/public/KaveriClub.apk
 !frontend/public/KaveriAdmin.apk
+!frontend/dist/KaveriClub.apk
+!frontend/dist/KaveriAdmin.apk
 *.aab

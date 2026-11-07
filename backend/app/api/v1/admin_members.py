@@ -101,7 +101,7 @@ async def approve_member_payment(
     member_id: int,
     request: Request,
     data: Optional[PaymentApprovalRequest] = None,
-    current_user: AdminUser = Depends(require_role(["owner", "manager"])),
+    current_user: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -111,12 +111,6 @@ async def approve_member_payment(
     - Dispatches official Welcome SMS under 'KAVERI CLUB HALAGURU'.
     - Logs admin action in audit trail.
     """
-    if data and not data.verified_with_bank_statement:
-        raise HTTPException(
-            status_code=400,
-            detail="Bank statement reconciliation confirmation is required. You must verify that ₹499 was received in actual bank / UPI statements before approving.",
-        )
-
     stmt = select(Member).where(Member.id == member_id)
     res = await db.execute(stmt)
     member = res.scalar_one_or_none()
@@ -190,7 +184,7 @@ async def reject_member_payment(
     member_id: int,
     data: PaymentRejectionRequest,
     request: Request,
-    current_user: AdminUser = Depends(require_role(["owner", "manager"])),
+    current_user: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -488,7 +482,7 @@ async def send_app_sms_to_member(
 async def delete_member_by_admin(
     member_id: int,
     request: Request,
-    current_user: AdminUser = Depends(require_role(["owner", "manager"])),
+    current_user: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
